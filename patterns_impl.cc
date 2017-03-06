@@ -9,6 +9,8 @@
 #include <list>
 #include <map>
 
+#define DEBUG 0
+
 // typical comment and markup - have to be single tokens!
 const char* ignored_tokens[] = { "*", "/*", "*/", "//", "%", "%%", "dnl",
     "//**", "/**", "-", "#", "**", "#~", ";", ";;", "=", ",",
@@ -67,7 +69,7 @@ void tokenize(TokenList& result, const std::string& str, int linenumber = 0)
         t.hash = 0;
         if (!linenumber && copy[0] == '$') {
             if (!strcmp(copy, "$owner")) {
-                t.hash = 5;
+                t.hash = 10;
             } else if (!strcmp(copy, "$year")) {
                 t.hash = 1;
             } else if (!strcmp(copy, "$var")) {
@@ -75,13 +77,13 @@ void tokenize(TokenList& result, const std::string& str, int linenumber = 0)
             } else if (!strcmp(copy, "$varl")) {
                 t.hash = 19;
             } else if (!strcmp(copy, "$ownerl")) {
-                t.hash = 10;
+                t.hash = 19;
             } else if (!strcmp(copy, "$years_owner")) {
                 t.hash = 15;
             } else if (!strcmp(copy, "$years")) {
                 // 2015,2016,2017 is still only one token for us, but
                 // better save than sorry
-                t.hash = 3;
+                t.hash = 8;
             }
         }
         if (!t.hash) {
@@ -156,9 +158,11 @@ int match_pattern(const TokenList& tokens, unsigned int offset, const Pattern& p
         if (offset + index >= tokens.size())
             return 0;
 
-        //  printf("MP %d %d %s<->%s %lx<->%lx\n", offset,index,tokens[offset+index].text.c_str(),
-        // 	   pat_iter->text.c_str(), tokens[offset+index].hash, pat_iter->hash);
-
+#if DEBUG
+	printf("MP %d %d %s<->%s %lx<->%lx\n", offset,index,tokens[offset+index].text.c_str(),
+	       pat_iter->text.c_str(), tokens[offset+index].hash, pat_iter->hash);
+#endif
+	
         if (pat_iter->hash < 20) {
             int max_gap = pat_iter->hash;
             pat_iter++;
@@ -170,6 +174,11 @@ int match_pattern(const TokenList& tokens, unsigned int offset, const Pattern& p
                 if (max_gap-- == 0) {
                     return 0;
                 }
+		
+#if DEBUG
+		printf("MP2 %d+%d %d %s<->%s %lx<->%lx\n", offset,max_gap,index,tokens[offset+index].text.c_str(),
+	       pat_iter->text.c_str(), tokens[offset+index].hash, pat_iter->hash);
+#endif
                 // we need to stop on further variables
                 if (pat_iter->hash <= 20)
                     break;
