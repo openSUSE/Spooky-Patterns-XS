@@ -51,7 +51,7 @@ void tokenize(TokenList& result, const std::string& str, int linenumber = 0)
     typedef boost::tokenizer<boost::char_separator<char> >
         tokenizer;
     // drop whitespace, but keep punctation in the token flow - mostly to be ignored
-    boost::char_separator<char> sep(" \r\n\t", ":-;.+!?\"\'#");
+    boost::char_separator<char> sep(" \r\n\t", ":-,;.+!?\"\'#");
     tokenizer tokens(str, sep);
     for (tokenizer::iterator tok_iter = tokens.begin();
          tok_iter != tokens.end(); ++tok_iter) {
@@ -265,9 +265,11 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
 
     int index = 0;
     for (Matches::const_iterator it = bests.begin(); it != bests.end(); ++it, ++index) {
-        av_push(ret, newSVuv(it->pattern));
-        av_push(ret, newSVuv(it->line_start));
-        av_push(ret, newSVuv(it->line_end));
+      AV *line = newAV();
+        av_push(line, newSVuv(it->pattern));
+        av_push(line, newSVuv(it->line_start));
+        av_push(line, newSVuv(it->line_end));
+	av_push(ret, newRV_noinc((SV*)line));
     }
     return ret;
 }
