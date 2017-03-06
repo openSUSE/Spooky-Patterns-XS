@@ -13,9 +13,9 @@
 
 // typical comment and markup - have to be single tokens!
 const char* ignored_tokens[] = { "*", "/*", "*/", "//", "%", "%%", "dnl",
-    "//**", "/**", "-", "#", "**", "#~", ";", ";;", "=", ",",
-    "\"", "\"\"", "--", "#:", "{", "\\", ">", ":", "==", "!", "::",
-    "##", "|", "+", 0 };
+    "//**", "/**", "#", "**", "#~", ";", ";;", ",",
+    "\"\"", "--", "#:", "{", "\\", ">", ":", "==", "!", "::",
+    "##", "|", 0 };
 
 bool to_ignore(const char* token)
 {
@@ -53,7 +53,7 @@ void tokenize(TokenList& result, const std::string& str, int linenumber = 0)
     typedef boost::tokenizer<boost::char_separator<char> >
         tokenizer;
     // drop whitespace, but keep punctation in the token flow - mostly to be ignored
-    boost::char_separator<char> sep(" \r\n\t", ":-,;.+!?\"\'#");
+    boost::char_separator<char> sep(" \r\n\t", ":-,;.+!?\"\'#=");
     tokenizer tokens(str, sep);
     for (tokenizer::iterator tok_iter = tokens.begin();
          tok_iter != tokens.end(); ++tok_iter) {
