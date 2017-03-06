@@ -7,7 +7,7 @@
 #include <cstring>
 #include <iostream>
 #include <list>
-#include <unordered_map>
+#include <map>
 
 // typical comment and markup - have to be single tokens!
 const char* ignored_tokens[] = { "*", "/*", "*/", "//", "%", "%%", "dnl",
@@ -107,7 +107,7 @@ AV* pattern_parse(const char* str)
     return ret;
 }
 
-typedef std::unordered_map<uint64_t, PatternList> PatternHash;
+typedef std::map<uint64_t, PatternList> PatternHash;
 
 struct Matcher {
     PatternHash patterns;
