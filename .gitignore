@@ -1,0 +1,10 @@
+Makefile
+*~
+XS.c
+XS.bs
+XS.o
+blib/
+pm_to_blib
+SpookyV2.o
+patterns_impl.o
+
