@@ -25,4 +25,4 @@ Matcher *pattern_init_matcher();
 void pattern_add(Matcher *m, unsigned id, AV *tokens);
 AV *pattern_find_matches(Matcher *m, const char *filename);
 void destroy_matcher(Matcher *m);
-AV *pattern_read_lines(const char *filename, int from, int to);
+AV *pattern_read_lines(const char *filename, HV *needed);

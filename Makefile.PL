@@ -12,7 +12,7 @@ unshift @INC, '-I. -I.. -Isrc';
 
 WriteMakefile(
     NAME              => 'Spooky::Patterns::XS',
-    VERSION_FROM      => 'lib/Spooky/Patterns/XS.pm',
+    VERSION_FROM      => 'XS.pm',
     CC => 'g++',
     LD => 'g++',
     XSOPT => '-C++',

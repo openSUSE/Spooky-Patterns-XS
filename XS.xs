@@ -4,7 +4,7 @@
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
-#include "spooky_patterns.h"
+#include "patterns_impl.h"
 
 typedef Matcher *Spooky__Patterns__XS__Matcher;
 
@@ -26,9 +26,9 @@ Spooky::Patterns::XS::Matcher init_matcher()
   OUTPUT:
     RETVAL
 
-AV *read_lines(const char *filename, int from, int to)
+AV *read_lines(const char *filename, HV *needed)
   CODE:
-    RETVAL = pattern_read_lines(filename, from, to);
+    RETVAL = pattern_read_lines(filename, needed);
 
   OUTPUT:
     RETVAL

@@ -2,7 +2,7 @@
 #include "perl.h"
 #include "XSUB.h"
 #include "SpookyV2.h"
-#include "spooky_patterns.h"
+#include "patterns_impl.h"
 #include <boost/tokenizer.hpp>
 #include <cstring>
 #include <iostream>
@@ -283,7 +283,7 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
     return ret;
 }
 
-AV* pattern_read_lines(const char* filename, int from, int to)
+AV* pattern_read_lines(const char* filename, HV *needed_lines)
 {
     AV* ret = newAV();
 
@@ -292,19 +292,29 @@ AV* pattern_read_lines(const char* filename, int from, int to)
         std::cerr << "Failed to open " << filename << std::endl;
         return ret;
     }
+    // really long file :)
+    char buffer[200];
     char line[1000];
     int linenumber = 1;
     TokenList ts;
     while (fgets(line, sizeof(line) - 1, input)) {
-        if (linenumber >= from) {
-            // fgets makes sure we have a 0 at the end
-            size_t len = strlen(line);
-            // remove one char (most likely newline)
-            line[--len] = 0;
-            av_push(ret, newSVpv(line, len));
-        }
-        if (++linenumber > to)
-            break;
+      sprintf(buffer, "%d", linenumber);
+      SV* val = hv_delete(needed_lines, buffer, strlen(buffer), 0);
+      if (val) {
+	// fgets makes sure we have a 0 at the end
+	size_t len = strlen(line);
+	// remove one char (most likely newline)
+	line[--len] = 0;
+	AV *row = newAV();
+	av_push(row, newSVuv(linenumber));
+	// better create a new one - I'm scared of mortals
+	av_push(row, newSVuv(SvUV(val)));
+	av_push(row, newSVpv(line, len));
+	av_push(ret, newRV_noinc((SV*)row));
+      }
+      if (av_len((AV*)needed_lines) == 0)
+	break;
+      ++linenumber;
     }
     fclose(input);
     return ret;
