@@ -1,19 +1,37 @@
+#! /usr/bin/perl
+
 use 5.012;
 use warnings;
 use Test::More;
 use Test::Deep;
 use Spooky::Patterns::XS;
 
-my %exp = ( 2 => [ [ 1, 2, 23 ] ], 1 => [ [ 1, 1, 165 ] ] );
-for my $num ( 1 .. 2 ) {
-    open( my $fh, '<', "t/04license.$num.pattern" );
+my $m = Spooky::Patterns::XS::init_matcher();
+
+for my $fn ( glob("t/04license.*.pattern") ) {
+    $fn =~ m/\.(.*)\.pattern/;
+    my $num = $1;
+    open( my $fh, '<', $fn );
     my $str = join( '', <$fh> );
     close($fh);
 
-    my $m = Spooky::Patterns::XS::init_matcher();
-    $m->add_pattern( 1, Spooky::Patterns::XS::parse_tokens($str) );
-    my $best = $m->find_matches("t/04license.$num.txt");
-    cmp_deeply( $exp{$num}, $best );
+    $m->add_pattern( $num, Spooky::Patterns::XS::parse_tokens($str) );
+    ok(1, "Loaded $fn");
+}
+
+my %exp = (
+	   1 => [ [ 1, 1, 165 ] ],
+	   2 => [ [ 2, 2, 23 ] ],
+	   3 => [ [7,6,7], [4,10,10]],
+	   4 => []
+	  );
+
+for my $fn ( glob("t/04license.*.txt") ) {
+    $fn =~ m/\.(.*)\.txt/;
+    my $num = $1;
+
+    my $best = $m->find_matches($fn);
+    cmp_deeply( $exp{$num}, $best, "Structure for $num fits" );
 }
 
 done_testing();

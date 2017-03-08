@@ -38,7 +38,6 @@ typedef std::vector<Token> TokenList;
 
 struct Pattern {
     TokenList tokens;
-    std::string name;
     int id;
 };
 
@@ -132,7 +131,7 @@ void pattern_add(Matcher* m, unsigned int id, av* tokens)
 
     SSize_t len = av_top_index(tokens) + 1;
     if (!len) {
-        std::cout << "add failed for id " << id << std::endl;
+        std::cerr << "add failed for id " << id << std::endl;
         return;
     }
     p.tokens.reserve(len);
@@ -195,16 +194,13 @@ int match_pattern(const TokenList& tokens, unsigned int offset, const Pattern& p
 }
 
 struct Match {
-    int line_start;
-    int line_end;
-    std::string lic_name;
+    int start;
+    int matched;
     int pattern;
-
-    int line_diff() const { return line_end - line_start; }
 };
 
 // if either the start or the end of one region is within the other
-bool line_overlap(int s1, int e1, int s2, int e2)
+bool match_overlap(int s1, int e1, int s2, int e2)
 {
     if (s1 >= s2 && s1 <= e2)
         return true;
@@ -235,7 +231,7 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
     Matches ms;
     for (unsigned int i = 0; i < ts.size(); i++) {
         PatternHash::const_iterator it = m->patterns.find(ts[i].hash);
-        //std::cout << ts[i].text << " " << (it == m->patterns.end()) << std::endl;
+        //std::cerr << ts[i].text << " " << (it == m->patterns.end()) << std::endl;
         if (it == m->patterns.end())
             continue;
         PatternList::const_iterator it2 = it->second.begin();
@@ -244,11 +240,10 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
             int matched = match_pattern(ts, i, *it2);
             if (matched) {
                 Match m;
-                m.line_start = ts[i].linenumber;
-                m.line_end = ts[i + matched - 1].linenumber;
+                m.start = i;
+                m.matched = matched;
                 m.pattern = it2->id;
-                m.lic_name = it2->name;
-                //	printf("L %s:%d-%d %s (%d)\n", filename, m.line_start, m.line_end, it2->name.c_str(), it2->id);
+		//fprintf(stderr, "L %s:%d(%d)-%d(%d) id:%d\n", filename, ts[i].linenumber, i, ts[i+matched-1].linenumber, m.matched, it2->id);
                 ms.push_back(m);
             }
         }
@@ -258,14 +253,15 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
         Matches::const_iterator it = ms.begin();
         Match best = *(it++);
         for (; it != ms.end(); ++it) {
-            if (best.line_diff() < it->line_diff()) {
+	  // the bigger IDs win on same matches - we expect newer patterns to be used
+	  if (best.matched < it->matched || (best.matched == it->matched && best.pattern < it->pattern)) {
                 best = *it;
             }
         }
-        //std::cout << filename << " " << best.lic_name << "(" << best.pattern  << ") " << best.line_start << ":" << best.line_end << std::endl;
+        //std::cerr << filename  << "(" << best.pattern  << ") " << best.start << ":" << best.matched << std::endl;
         bests.push_back(best);
         for (Matches::iterator it2 = ms.begin(); it2 != ms.end();) {
-            if (line_overlap(it2->line_start, it2->line_end, best.line_start, best.line_end))
+            if (match_overlap(it2->start, it2->start + it2->matched, best.start, best.start + best.matched))
                 it2 = ms.erase(it2);
             else
                 it2++;
@@ -276,8 +272,8 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
     for (Matches::const_iterator it = bests.begin(); it != bests.end(); ++it, ++index) {
       AV *line = newAV();
         av_push(line, newSVuv(it->pattern));
-        av_push(line, newSVuv(it->line_start));
-        av_push(line, newSVuv(it->line_end));
+        av_push(line, newSVuv(ts[it->start].linenumber));
+        av_push(line, newSVuv(ts[it->start+it->matched-1].linenumber));
 	av_push(ret, newRV_noinc((SV*)line));
     }
     return ret;
