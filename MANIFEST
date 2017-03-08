@@ -13,6 +13,12 @@ t/04license.1.pattern
 t/04license.1.txt
 t/04license.2.pattern
 t/04license.2.txt
+t/04license.3.pattern
+t/04license.3.txt
+t/04license.4.pattern
+t/04license.5.pattern
+t/04license.6.pattern
+t/04license.7.pattern
 t/04license.t
 t/05readlines.t
 typemap
