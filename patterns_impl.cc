@@ -12,9 +12,8 @@
 #define DEBUG 0
 
 // typical comment and markup - have to be single tokens!
-const char* ignored_tokens[] = { "*", "/*", "*/", "//", "%", "%%", "dnl",
-    "//**", "/**", "#", "**", "#~", ";", ";;", ",",
-    "\"\"", "--", "#:", "{", "\\", ">", ":", "==", "!", "::",
+const char* ignored_tokens[] = { "/*", "*/", "//", "%", "%%", "dnl",
+    "//**", "/**", "**", "#~", ";;", "\"\"", "--", "#:", "{", "\\", ">", "==", "::",
     "##", "|", 0 };
 
 bool to_ignore(const char* token)
@@ -38,13 +37,6 @@ struct Token {
 
 typedef std::vector<Token> TokenList;
 
-struct Pattern {
-    TokenList tokens;
-    int id;
-};
-
-typedef std::vector<Pattern> PatternList;
-
 const int MAX_TOKEN_LENGTH = 100;
 
 void tokenize(TokenList& result, const std::string& str, int linenumber = 0)
@@ -54,7 +46,7 @@ void tokenize(TokenList& result, const std::string& str, int linenumber = 0)
     typedef boost::tokenizer<boost::char_separator<char> >
         tokenizer;
     // drop whitespace, but keep punctation in the token flow - mostly to be ignored
-    boost::char_separator<char> sep(" \r\n\t", ":-,;.+!?\"\'#=");
+    boost::char_separator<char> sep(" \r\n\t*;,:!#", "-.+?\"\'=");
     tokenizer tokens(str, sep);
     for (tokenizer::iterator tok_iter = tokens.begin();
          tok_iter != tokens.end(); ++tok_iter) {
@@ -98,6 +90,13 @@ void tokenize(TokenList& result, const std::string& str, int linenumber = 0)
         result.push_back(t);
     }
 }
+
+struct Pattern {
+    TokenList tokens;
+    int id;
+};
+
+typedef std::vector<Pattern> PatternList;
 
 AV* pattern_parse(const char* str)
 {
