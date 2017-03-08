@@ -136,22 +136,23 @@ void pattern_add(Matcher* m, unsigned int id, av* tokens)
     }
     p.tokens.reserve(len);
 
+    uint64_t prime = SvUV(*av_fetch(tokens, 0, 0));
     Token t;
-    for (SSize_t i = 0; i < len; ++i) {
+    for (SSize_t i = 1; i < len; ++i) {
         SV* sv = *av_fetch(tokens, i, 0);
         UV uv = SvUV(sv);
         t.hash = uv;
         p.tokens.push_back(t);
     }
 
-    m->patterns[p.tokens[0].hash].push_back(p);
+    m->patterns[prime].push_back(p);
 }
 
 int match_pattern(const TokenList& tokens, unsigned int offset, const Pattern& p)
 {
-    unsigned int index = 0;
+    unsigned int index = 1; // the prime was already checked
     TokenList::const_iterator pat_iter = p.tokens.begin();
-
+    
     while (pat_iter != p.tokens.end()) {
         // pattern longer than text -> fail
         if (offset + index >= tokens.size())
