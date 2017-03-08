@@ -1,5 +1,8 @@
 Revision history for Perl extension Spooky::Patterns::XS
 
+1.02    2017-03-08
+        - Some optimizations
+
 1.01    2017-03-08
         - More deterministic return - looking at the pattern ID
 
