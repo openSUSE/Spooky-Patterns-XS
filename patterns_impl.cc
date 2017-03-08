@@ -31,7 +31,9 @@ bool to_ignore(const char* token)
 struct Token {
     int linenumber;
     uint64_t hash;
+#if DEBUG
     std::string text;
+#endif
 };
 
 typedef std::vector<Token> TokenList;
@@ -63,7 +65,9 @@ void tokenize(TokenList& result, const std::string& str, int linenumber = 0)
         for (unsigned int i = 0; i < len; i++)
             copy[i] = tolower(copy[i]);
         Token t;
+#if DEBUG
         t.text = copy;
+#endif
         t.linenumber = linenumber;
         t.hash = 0;
         if (!linenumber && copy[0] == '$') {
