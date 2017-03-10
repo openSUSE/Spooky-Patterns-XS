@@ -16,7 +16,7 @@ WriteMakefile(
     CC => 'g++',
     LD => 'g++',
     XSOPT => '-C++',
-    LICENSE       => 'mit',
+    LICENSE       => 'GPL-2.0+',
     AUTHOR            => 'Stephan Kulow <coolo@suse.de>',
     INC               => join(' ', @INC),
     LIBS              => [ join(' ', @LIBPATH, @LIBS) ],
@@ -25,7 +25,7 @@ WriteMakefile(
     PREREQ_PM         => { 'Test::Deep' => 0 },
     META_MERGE        => {
         resources => {
-            license    => 'https://opensource.org/licenses/MIT',
+            license    => 'https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt',
             repository => 'https://github.com/coolo/spooky-pattern-xs',
         },
     },

@@ -1,3 +1,18 @@
+// Copyright © 2017 SUSE LLC
+//
+// This program is free software; you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation; either version 2 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License along
+// with this program; if not, see <http://www.gnu.org/licenses/>.
+
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
@@ -303,8 +318,10 @@ AV* pattern_read_lines(const char* filename, HV *needed_lines)
       if (val) {
 	// fgets makes sure we have a 0 at the end
 	size_t len = strlen(line);
-	// remove one char (most likely newline)
-	line[--len] = 0;
+	if (len) {
+	  // remove one char (most likely newline)
+	  line[--len] = 0;
+	}
 	AV *row = newAV();
 	av_push(row, newSVuv(linenumber));
 	// better create a new one - I'm scared of mortals
