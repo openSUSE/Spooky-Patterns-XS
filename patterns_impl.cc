@@ -121,8 +121,12 @@ AV* pattern_parse(const char* str)
     AV* ret = newAV();
     av_extend(ret, t.size());
     int index = 0;
-    for (TokenList::const_iterator it = t.begin(); it != t.end(); ++it, ++index) {
+    for (TokenList::const_iterator it = t.begin(); it != t.end(); ++it) {
+	// do not start with an expansion variable
+	if (!index && it->hash < 20)
+            continue;
         av_store(ret, index, newSVuv(it->hash));
+	++index;
     }
     return ret;
 }
