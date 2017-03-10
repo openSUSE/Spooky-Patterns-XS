@@ -28,8 +28,9 @@
 
 // typical comment and markup - have to be single tokens!
 const char* ignored_tokens[] = { "/*", "*/", "//", "%", "%%", "dnl",
-    "//**", "/**", "**", "#~", ";;", "\"\"", "--", "#:", "{", "\\", ">", "==", "::",
-    "##", "|", 0 };
+				 "//**", "/**", "**", "#~", ";;", "\"\"", "--", "#:",
+				 "{", "\\", ">", "==", "::",
+				 "##", "|", 0 };
 
 bool to_ignore(const char* token)
 {
@@ -59,7 +60,7 @@ void tokenize(TokenList& result, const std::string& str, int linenumber = 0)
     char copy[MAX_TOKEN_LENGTH];
 
     typedef boost::tokenizer<boost::char_separator<char> >
-        tokenizer;
+      tokenizer;
     // drop whitespace, but keep punctation in the token flow - mostly to be ignored
     boost::char_separator<char> sep(" \r\n\t*;,:!#", "-.+?\"\'=");
     tokenizer tokens(str, sep);
@@ -166,50 +167,47 @@ void pattern_add(Matcher* m, unsigned int id, av* tokens)
     m->patterns[prime].push_back(p);
 }
 
+int check_token_matches(const TokenList &tokens, unsigned int offset, TokenList::const_iterator pat_iter, const TokenList::const_iterator &pat_end)
+{
+  while (pat_iter != pat_end) {
+    // pattern longer than text -> fail
+    if (offset >= tokens.size())
+      return 0;
+    
+#if DEBUG
+    fprintf(stderr, "MP %d %s<->%s %lx<->%lx\n", offset,tokens[offset].text.c_str(),
+	   pat_iter->text.c_str(), tokens[offset].hash, pat_iter->hash);
+#endif
+	
+    if (pat_iter->hash < 20) {
+      int max_gap = pat_iter->hash;
+      for (int i = 0; i <= max_gap; ++i) {
+	int matched = check_token_matches(tokens, offset + i, pat_iter + 1, pat_end);
+	if (matched)
+	  return matched;
+      }
+      return 0;
+    } else {
+      if (tokens[offset].hash != pat_iter->hash) {
+	return 0;
+      }
+    }
+    offset++;
+    pat_iter++;
+  }
+  return offset;
+}
+
 int match_pattern(const TokenList& tokens, unsigned int offset, const Pattern& p)
 {
     unsigned int index = 1; // the prime was already checked
     TokenList::const_iterator pat_iter = p.tokens.begin();
-    
-    while (pat_iter != p.tokens.end()) {
-        // pattern longer than text -> fail
-        if (offset + index >= tokens.size())
-            return 0;
 
-#if DEBUG
-	printf("MP %d %d %s<->%s %lx<->%lx\n", offset,index,tokens[offset+index].text.c_str(),
-	       pat_iter->text.c_str(), tokens[offset+index].hash, pat_iter->hash);
-#endif
-	
-        if (pat_iter->hash < 20) {
-            int max_gap = pat_iter->hash;
-            pat_iter++;
-            do {
-                // skip at least one word
-                index++;
-                if (offset + index >= tokens.size())
-                    return 0;
-                if (max_gap-- == 0) {
-                    return 0;
-                }
-		
-#if DEBUG
-		printf("MP2 %d+%d %d %s<->%s %lx<->%lx\n", offset,max_gap,index,tokens[offset+index].text.c_str(),
-	       pat_iter->text.c_str(), tokens[offset+index].hash, pat_iter->hash);
-#endif
-                // we need to stop on further variables
-                if (pat_iter->hash <= 20)
-                    break;
-            } while (tokens[offset + index].hash != pat_iter->hash);
-        } else {
-            if (tokens[offset + index].hash != pat_iter->hash) {
-                return 0;
-            }
-            index++;
-            pat_iter++;
-        }
-    }
-    return index;
+    index = check_token_matches(tokens, offset + index, pat_iter, p.tokens.end());
+    if (index)
+      return index - offset;
+    else
+      return 0;
 }
 
 struct Match {

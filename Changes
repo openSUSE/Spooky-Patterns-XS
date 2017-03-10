@@ -1,5 +1,8 @@
 Revision history for Perl extension Spooky::Patterns::XS
 
+1.04    2017-03-10
+        - Proper expansion of globs
+
 1.03    2017-03-10
         - Do not crash on binary files
 
