@@ -28,9 +28,9 @@
 
 // typical comment and markup - have to be single tokens!
 const char* ignored_tokens[] = { "/*", "*/", "//", "%", "%%", "dnl",
-				 "//**", "/**", "**", "#~", ";;", "\"\"", "--", "#:",
-				 "{", "\\", ">", "==", "::",
-				 "##", "|", 0 };
+    "//**", "/**", "**", "#~", ";;", "\"\"", "--", "#:",
+    "{", "\\", ">", "==", "::", " ",
+    "##", "|", 0 };
 
 bool to_ignore(const char* token)
 {
@@ -60,7 +60,7 @@ void tokenize(TokenList& result, const std::string& str, int linenumber = 0)
     char copy[MAX_TOKEN_LENGTH];
 
     typedef boost::tokenizer<boost::char_separator<char> >
-      tokenizer;
+        tokenizer;
     // drop whitespace, but keep punctation in the token flow - mostly to be ignored
     boost::char_separator<char> sep(" \r\n\t*;,:!#", "-.+?\"\'=");
     tokenizer tokens(str, sep);
@@ -68,10 +68,14 @@ void tokenize(TokenList& result, const std::string& str, int linenumber = 0)
          tok_iter != tokens.end(); ++tok_iter) {
         size_t len = tok_iter->copy(copy, MAX_TOKEN_LENGTH - 1);
         copy[len] = 0;
+        for (unsigned int i = 0; i < len; i++) {
+            // snipe out escape sequences
+            if (copy[i] < ' ')
+                copy[i] = ' ';
+            copy[i] = tolower(copy[i]);
+        }
         if (to_ignore(copy))
             continue;
-        for (unsigned int i = 0; i < len; i++)
-            copy[i] = tolower(copy[i]);
         Token t;
 #if DEBUG
         t.text = copy;
@@ -122,11 +126,11 @@ AV* pattern_parse(const char* str)
     av_extend(ret, t.size());
     int index = 0;
     for (TokenList::const_iterator it = t.begin(); it != t.end(); ++it) {
-	// do not start with an expansion variable
-	if (!index && it->hash < 20)
+        // do not start with an expansion variable
+        if (!index && it->hash < 20)
             continue;
         av_store(ret, index, newSVuv(it->hash));
-	++index;
+        ++index;
     }
     return ret;
 }
@@ -171,35 +175,34 @@ void pattern_add(Matcher* m, unsigned int id, av* tokens)
     m->patterns[prime].push_back(p);
 }
 
-int check_token_matches(const TokenList &tokens, unsigned int offset, TokenList::const_iterator pat_iter, const TokenList::const_iterator &pat_end)
+int check_token_matches(const TokenList& tokens, unsigned int offset, TokenList::const_iterator pat_iter, const TokenList::const_iterator& pat_end)
 {
-  while (pat_iter != pat_end) {
-    // pattern longer than text -> fail
-    if (offset >= tokens.size())
-      return 0;
-    
+    while (pat_iter != pat_end) {
+        // pattern longer than text -> fail
+        if (offset >= tokens.size())
+            return 0;
+
 #if DEBUG
-    fprintf(stderr, "MP %d %s<->%s %lx<->%lx\n", offset,tokens[offset].text.c_str(),
-	   pat_iter->text.c_str(), tokens[offset].hash, pat_iter->hash);
+        fprintf(stderr, "MP %d %d:%s %lx-%lx\n", offset, tokens[offset].hash == pat_iter->hash, tokens[offset].text.c_str(), pat_iter->hash, tokens[offset].hash);
 #endif
-	
-    if (pat_iter->hash < 20) {
-      int max_gap = pat_iter->hash;
-      for (int i = 0; i <= max_gap; ++i) {
-	int matched = check_token_matches(tokens, offset + i, pat_iter + 1, pat_end);
-	if (matched)
-	  return matched;
-      }
-      return 0;
-    } else {
-      if (tokens[offset].hash != pat_iter->hash) {
-	return 0;
-      }
+
+        if (pat_iter->hash < 20) {
+            int max_gap = pat_iter->hash;
+            for (int i = 0; i <= max_gap; ++i) {
+                int matched = check_token_matches(tokens, offset + i, pat_iter + 1, pat_end);
+                if (matched)
+                    return matched;
+            }
+            return 0;
+        } else {
+            if (tokens[offset].hash != pat_iter->hash) {
+                return 0;
+            }
+        }
+        offset++;
+        pat_iter++;
     }
-    offset++;
-    pat_iter++;
-  }
-  return offset;
+    return offset;
 }
 
 int match_pattern(const TokenList& tokens, unsigned int offset, const Pattern& p)
@@ -209,9 +212,9 @@ int match_pattern(const TokenList& tokens, unsigned int offset, const Pattern& p
 
     index = check_token_matches(tokens, offset + index, pat_iter, p.tokens.end());
     if (index)
-      return index - offset;
+        return index - offset;
     else
-      return 0;
+        return 0;
 }
 
 struct Match {
@@ -264,7 +267,7 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
                 m.start = i;
                 m.matched = matched;
                 m.pattern = it2->id;
-		//fprintf(stderr, "L %s:%d(%d)-%d(%d) id:%d\n", filename, ts[i].linenumber, i, ts[i+matched-1].linenumber, m.matched, it2->id);
+                //fprintf(stderr, "L %s:%d(%d)-%d(%d) id:%d\n", filename, ts[i].linenumber, i, ts[i+matched-1].linenumber, m.matched, it2->id);
                 ms.push_back(m);
             }
         }
@@ -274,8 +277,8 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
         Matches::const_iterator it = ms.begin();
         Match best = *(it++);
         for (; it != ms.end(); ++it) {
-	  // the bigger IDs win on same matches - we expect newer patterns to be used
-	  if (best.matched < it->matched || (best.matched == it->matched && best.pattern < it->pattern)) {
+            // the bigger IDs win on same matches - we expect newer patterns to be used
+            if (best.matched < it->matched || (best.matched == it->matched && best.pattern < it->pattern)) {
                 best = *it;
             }
         }
@@ -291,16 +294,16 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
 
     int index = 0;
     for (Matches::const_iterator it = bests.begin(); it != bests.end(); ++it, ++index) {
-      AV *line = newAV();
+        AV* line = newAV();
         av_push(line, newSVuv(it->pattern));
         av_push(line, newSVuv(ts[it->start].linenumber));
-        av_push(line, newSVuv(ts[it->start+it->matched-1].linenumber));
-	av_push(ret, newRV_noinc((SV*)line));
+        av_push(line, newSVuv(ts[it->start + it->matched - 1].linenumber));
+        av_push(ret, newRV_noinc((SV*)line));
     }
     return ret;
 }
 
-AV* pattern_read_lines(const char* filename, HV *needed_lines)
+AV* pattern_read_lines(const char* filename, HV* needed_lines)
 {
     AV* ret = newAV();
 
@@ -315,25 +318,25 @@ AV* pattern_read_lines(const char* filename, HV *needed_lines)
     int linenumber = 1;
     TokenList ts;
     while (fgets(line, sizeof(line) - 1, input)) {
-      sprintf(buffer, "%d", linenumber);
-      SV* val = hv_delete(needed_lines, buffer, strlen(buffer), 0);
-      if (val) {
-	// fgets makes sure we have a 0 at the end
-	size_t len = strlen(line);
-	if (len) {
-	  // remove one char (most likely newline)
-	  line[--len] = 0;
-	}
-	AV *row = newAV();
-	av_push(row, newSVuv(linenumber));
-	// better create a new one - I'm scared of mortals
-	av_push(row, newSVuv(SvUV(val)));
-	av_push(row, newSVpv(line, len));
-	av_push(ret, newRV_noinc((SV*)row));
-      }
-      if (av_len((AV*)needed_lines) == 0)
-	break;
-      ++linenumber;
+        sprintf(buffer, "%d", linenumber);
+        SV* val = hv_delete(needed_lines, buffer, strlen(buffer), 0);
+        if (val) {
+            // fgets makes sure we have a 0 at the end
+            size_t len = strlen(line);
+            if (len) {
+                // remove one char (most likely newline)
+                line[--len] = 0;
+            }
+            AV* row = newAV();
+            av_push(row, newSVuv(linenumber));
+            // better create a new one - I'm scared of mortals
+            av_push(row, newSVuv(SvUV(val)));
+            av_push(row, newSVpv(line, len));
+            av_push(ret, newRV_noinc((SV*)row));
+        }
+        if (av_len((AV*)needed_lines) == 0)
+            break;
+        ++linenumber;
     }
     fclose(input);
     return ret;

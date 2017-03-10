@@ -1,5 +1,8 @@
 Revision history for Perl extension Spooky::Patterns::XS
 
+1.06    2017-03-10
+        - Handle escape sequences correctly
+
 1.05    2017-03-10
         - Ignore globs at the start of a pattern
 
