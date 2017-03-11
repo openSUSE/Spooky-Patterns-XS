@@ -1,4 +1,5 @@
 Changes
+COPYING
 Makefile.PL
 MANIFEST			This list of files
 patterns_impl.cc
@@ -11,14 +12,27 @@ t/03match.t
 t/03match.txt
 t/04license.1.pattern
 t/04license.1.txt
+t/04license.10.pattern
+t/04license.11.pattern
+t/04license.12.pattern
+t/04license.13.pattern
+t/04license.14.pattern
+t/04license.15.pattern
+t/04license.16.pattern
 t/04license.2.pattern
 t/04license.2.txt
 t/04license.3.pattern
 t/04license.3.txt
 t/04license.4.pattern
+t/04license.4.txt
 t/04license.5.pattern
+t/04license.5.txt
 t/04license.6.pattern
+t/04license.6.txt
 t/04license.7.pattern
+t/04license.7.txt
+t/04license.8.pattern
+t/04license.9.pattern
 t/04license.t
 t/05readlines.t
 typemap

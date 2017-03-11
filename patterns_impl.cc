@@ -82,25 +82,14 @@ void tokenize(TokenList& result, const std::string& str, int linenumber = 0)
 #endif
         t.linenumber = linenumber;
         t.hash = 0;
-        if (!linenumber && copy[0] == '$') {
-            if (!strcmp(copy, "$owner")) {
-                t.hash = 10;
-            } else if (!strcmp(copy, "$year")) {
-                t.hash = 1;
-            } else if (!strcmp(copy, "$var")) {
-                t.hash = 2;
-            } else if (!strcmp(copy, "$varl")) {
-                t.hash = 19;
-            } else if (!strcmp(copy, "$ownerl")) {
-                t.hash = 19;
-            } else if (!strcmp(copy, "$years_owner")) {
-                t.hash = 15;
-            } else if (!strcmp(copy, "$years")) {
-                // 2015,2016,2017 is still only one token for us, but
-                // better save than sorry
-                t.hash = 8;
-            }
-        }
+        if (!linenumber && !strncmp(copy, "$skip", 5)) {
+	  const char *number = copy + 5;
+	  char *endptr;
+	  t.hash = strtol(number, &endptr, 10);
+	  if (*endptr || t.hash > 20) { // more than just a number
+	    t.hash = 0;
+	  }
+	}
         if (!t.hash) {
             // hash64 has no collisions on our patterns and is very fast
             // *and* 0-20 are "free"
