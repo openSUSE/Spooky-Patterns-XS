@@ -256,7 +256,9 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
                 m.start = i;
                 m.matched = matched;
                 m.pattern = it2->id;
-                //fprintf(stderr, "L %s:%d(%d)-%d(%d) id:%d\n", filename, ts[i].linenumber, i, ts[i+matched-1].linenumber, m.matched, it2->id);
+#if DEBUG
+                fprintf(stderr, "L %s:%d(%d)-%d(%d) id:%d\n", filename, ts[i].linenumber, i, ts[i+matched-1].linenumber, m.matched, it2->id);
+#endif
                 ms.push_back(m);
             }
         }
@@ -271,12 +273,17 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
                 best = *it;
             }
         }
-        //std::cerr << filename  << "(" << best.pattern  << ") " << best.start << ":" << best.matched << std::endl;
+#if DEBUG
+        std::cerr << filename  << "(" << best.pattern  << ") " << best.start << ":" << best.matched << std::endl;
+#endif
         bests.push_back(best);
         for (Matches::iterator it2 = ms.begin(); it2 != ms.end();) {
-            if (match_overlap(it2->start, it2->start + it2->matched, best.start, best.start + best.matched))
+	  if (match_overlap(it2->start, it2->start + it2->matched - 1, best.start, best.start + best.matched - 1)) {
+#if DEBUG
+	        std::cerr << filename  << "( erase " << it2->pattern  << ") " << it2->start << ":" << it2->matched << std::endl;
+#endif
                 it2 = ms.erase(it2);
-            else
+	  } else
                 it2++;
         }
     }

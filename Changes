@@ -1,5 +1,8 @@
 Revision history for Perl extension Spooky::Patterns::XS
 
+1.11    2017-03-12
+        - Fix successive matches
+
 1.10    2017-03-11
         - Only support $SKIP variables
 
