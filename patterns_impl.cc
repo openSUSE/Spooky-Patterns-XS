@@ -327,7 +327,10 @@ AV* pattern_read_lines(const char* filename, HV* needed_lines)
             av_push(row, newSVuv(linenumber));
             // better create a new one - I'm scared of mortals
             av_push(row, newSVuv(SvUV(val)));
-            av_push(row, newSVpv(line, len));
+            SV *str = newSVpv(line, len);
+            // blindly assume that
+            SvUTF8_on(str);
+            av_push(row, str);
             av_push(ret, newRV_noinc((SV*)row));
         }
         if (av_len((AV*)needed_lines) == 0)
