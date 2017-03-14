@@ -39,6 +39,7 @@ t/04license.8.txt
 t/04license.9.pattern
 t/04license.t
 t/05readlines.1.txt
+t/05readlines.2.raw
 t/05readlines.t
 typemap
 XS.pm
