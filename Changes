@@ -1,5 +1,8 @@
 Revision history for Perl extension Spooky::Patterns::XS
 
+1.21    2017-03-15
+        - make sure hex is always 32 bytes long
+
 1.20    2017-03-15
         - add Hash package for completness
 
