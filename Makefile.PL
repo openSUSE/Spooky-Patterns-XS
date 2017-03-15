@@ -14,6 +14,9 @@ WriteMakefile(
     NAME              => 'Spooky::Patterns::XS',
     VERSION_FROM      => 'XS.pm',
     CC => 'g++',
+    depend => {
+       'patterns_impl.o' => 'TokenTree.h'
+    },
     LD => 'g++',
     XSOPT => '-C++',
     LICENSE       => 'GPL-2.0+',

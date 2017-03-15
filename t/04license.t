@@ -38,7 +38,7 @@ for my $fn ( glob("t/04license.*.txt") ) {
     my $best = $m->find_matches($fn);
     #use Data::Dumper;
     #print STDERR Dumper($best);
-    cmp_deeply( $exp{$num}, $best, "Structure for $num fits" );
+    cmp_deeply( $best, $exp{$num}, "Structure for $num fits" );
 }
 
 done_testing();

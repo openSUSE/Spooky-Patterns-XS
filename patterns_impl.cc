@@ -13,35 +13,18 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, see <http://www.gnu.org/licenses/>.
 
-#include "EXTERN.h"
-#include "perl.h"
-#include "XSUB.h"
-#include "SpookyV2.h"
 #include "patterns_impl.h"
-#include <boost/tokenizer.hpp>
+#include "EXTERN.h"
+#include "SpookyV2.h"
+#include "TokenTree.h"
+#include "XSUB.h"
+#include "perl.h"
 #include <cstring>
 #include <iostream>
 #include <list>
 #include <map>
 
 #define DEBUG 0
-
-// typical comment and markup - have to be single tokens!
-const char* ignored_tokens[] = { "/*", "*/", "//", "%", "%%", "dnl",
-    "//**", "/**", "**", "#~", ";;", "\"\"", "--", "#:",
-    "{", "\\", ">", "==", "::", " ",
-    "##", "|", 0 };
-
-bool to_ignore(const char* token)
-{
-    int index = 0;
-    while (ignored_tokens[index]) {
-        if (!strcmp(token, ignored_tokens[index]))
-            return true;
-        index++;
-    }
-    return false;
-}
 
 struct Token {
     int linenumber;
@@ -55,62 +38,115 @@ typedef std::vector<Token> TokenList;
 
 const int MAX_TOKEN_LENGTH = 100;
 
-void tokenize(TokenList& result, const std::string& str, int linenumber = 0)
-{
-    char copy[MAX_TOKEN_LENGTH];
-
-    typedef boost::tokenizer<boost::char_separator<char> >
-        tokenizer;
-    // drop whitespace, but keep punctation in the token flow - mostly to be ignored
-    boost::char_separator<char> sep(" \r\n\t*;,:!#", "-.+?\"\'=");
-    tokenizer tokens(str, sep);
-    for (tokenizer::iterator tok_iter = tokens.begin();
-         tok_iter != tokens.end(); ++tok_iter) {
-        size_t len = tok_iter->copy(copy, MAX_TOKEN_LENGTH - 1);
-        copy[len] = 0;
-        for (unsigned int i = 0; i < len; i++) {
-            // snipe out escape sequences
-            if (copy[i] < ' ')
-                copy[i] = ' ';
-            copy[i] = tolower(copy[i]);
-        }
-        if (to_ignore(copy))
-            continue;
-        Token t;
-#if DEBUG
-        t.text = copy;
-#endif
-        t.linenumber = linenumber;
-        t.hash = 0;
-        if (!linenumber && !strncmp(copy, "$skip", 5)) {
-	  const char *number = copy + 5;
-	  char *endptr;
-	  t.hash = strtol(number, &endptr, 10);
-	  if (*endptr || t.hash > 20) { // more than just a number
-	    t.hash = 0;
-	  }
-	}
-        if (!t.hash) {
-            // hash64 has no collisions on our patterns and is very fast
-            // *and* 0-20 are "free"
-            t.hash = SpookyHash::Hash64(copy, len, 1);
-            assert(t.hash > 20);
-        }
-        result.push_back(t);
-    }
-}
-
 struct Pattern {
     TokenList tokens;
     int id;
 };
 
 typedef std::vector<Pattern> PatternList;
+typedef std::map<uint64_t, PatternList> PatternHash;
+
+struct Matcher {
+    TokenTree ignore_tree;
+    PatternHash patterns;
+
+    bool to_ignore(uint64_t t)
+    {
+        return ignore_tree.find(t) != 0;
+    }
+
+    Matcher()
+    {
+        int index = 0;
+        // typical comment and markup - have to be single tokens!
+        static const char* ignored_tokens[] = { "/*", "*/", "//", "%", "%%", "dnl"
+                                                                             "//**",
+            "/**", "**", "#~", ";;", "\"\"",
+            "--", "#:", "\\", ">", "==", "::",
+            "##", 0 };
+
+        while (ignored_tokens[index]) {
+            int len = strlen(ignored_tokens[index]);
+            uint64_t h = SpookyHash::Hash64(ignored_tokens[index], len, 1);
+            ignore_tree.insert(h);
+            index++;
+        }
+    }
+};
+
+Matcher* pattern_init_matcher()
+{
+    return new Matcher;
+}
+
+void destroy_matcher(Matcher* m)
+{
+    delete m;
+}
+
+static void add_token(Matcher* m, TokenList& result, const char* start, size_t len, int line)
+{
+    if (!len)
+        return;
+
+    Token t;
+#if DEBUG
+    t.text = std::string(start, len);
+#endif
+    t.linenumber = line;
+    t.hash = 0;
+    if (!line && len > 5 && len < 9 && !strncmp(start, "$skip", 5)) {
+        char number[10];
+        strncpy(number, start + 5, len - 5);
+        number[len - 5] = 0;
+        char* endptr;
+        t.hash = strtol(number, &endptr, 10);
+        if (*endptr || t.hash > 20) // more than just a number
+            t.hash = 0;
+    }
+    if (!t.hash) {
+        // hash64 has no collisions on our patterns and is very fast
+        // *and* 0-20 are "free"
+        t.hash = SpookyHash::Hash64(start, len, 1);
+        assert(t.hash > 20);
+        if (m->to_ignore(t.hash))
+            return;
+    }
+    result.push_back(t);
+}
+
+void tokenize(Matcher* m, TokenList& result, char* str, int linenumber = 0)
+{
+    static const char* ignore_seps = " \r\n\t*;,:!#{}|";
+    static const char* single_seps = "-.+?\"\'=";
+
+    const char* start = str;
+
+    for (; *str; ++str) {
+        // snipe out escape sequences
+        if (*str < ' ')
+            *str = ' ';
+        *str = tolower(*str);
+        bool ignored = (strchr(ignore_seps, *str) != NULL);
+        if (ignored || strchr(single_seps, *str)) {
+            add_token(m, result, start, str - start, linenumber);
+            //fprintf(stderr, "TO %d:'%s'\n", ignored, str);
+            if (!ignored)
+                add_token(m, result, str, 1, linenumber);
+            start = str + 1;
+        }
+    }
+    add_token(m, result, start, str - start, linenumber);
+}
 
 AV* pattern_parse(const char* str)
 {
+    Matcher m;
+
     TokenList t;
-    tokenize(t, str);
+    char* copy = strdup(str);
+    tokenize(&m, t, copy);
+    free(copy);
     AV* ret = newAV();
     av_extend(ret, t.size());
     int index = 0;
@@ -122,22 +158,6 @@ AV* pattern_parse(const char* str)
         ++index;
     }
     return ret;
-}
-
-typedef std::map<uint64_t, PatternList> PatternHash;
-
-struct Matcher {
-    PatternHash patterns;
-};
-
-Matcher* pattern_init_matcher()
-{
-    return new Matcher;
-}
-
-void destroy_matcher(Matcher* m)
-{
-    delete m;
 }
 
 void pattern_add(Matcher* m, unsigned int id, av* tokens)
@@ -237,7 +257,7 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
     int linenumber = 1;
     TokenList ts;
     while (fgets(line, sizeof(line) - 1, input)) {
-        tokenize(ts, line, linenumber++);
+        tokenize(m, ts, line, linenumber++);
     }
     fclose(input);
 
@@ -257,7 +277,7 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
                 m.matched = matched;
                 m.pattern = it2->id;
 #if DEBUG
-                fprintf(stderr, "L %s:%d(%d)-%d(%d) id:%d\n", filename, ts[i].linenumber, i, ts[i+matched-1].linenumber, m.matched, it2->id);
+                fprintf(stderr, "L %s:%d(%d)-%d(%d) id:%d\n", filename, ts[i].linenumber, i, ts[i + matched - 1].linenumber, m.matched, it2->id);
 #endif
                 ms.push_back(m);
             }
@@ -274,16 +294,16 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
             }
         }
 #if DEBUG
-        std::cerr << filename  << "(" << best.pattern  << ") " << best.start << ":" << best.matched << std::endl;
+        std::cerr << filename << "(" << best.pattern << ") " << best.start << ":" << best.matched << std::endl;
 #endif
         bests.push_back(best);
         for (Matches::iterator it2 = ms.begin(); it2 != ms.end();) {
-	  if (match_overlap(it2->start, it2->start + it2->matched - 1, best.start, best.start + best.matched - 1)) {
+            if (match_overlap(it2->start, it2->start + it2->matched - 1, best.start, best.start + best.matched - 1)) {
 #if DEBUG
-	        std::cerr << filename  << "( erase " << it2->pattern  << ") " << it2->start << ":" << it2->matched << std::endl;
+                std::cerr << filename << "( erase " << it2->pattern << ") " << it2->start << ":" << it2->matched << std::endl;
 #endif
                 it2 = ms.erase(it2);
-	  } else
+            } else
                 it2++;
         }
     }
@@ -327,7 +347,7 @@ AV* pattern_read_lines(const char* filename, HV* needed_lines)
             av_push(row, newSVuv(linenumber));
             // better create a new one - I'm scared of mortals
             av_push(row, newSVuv(SvUV(val)));
-            SV *str = newSVpv(line, len);
+            SV* str = newSVpv(line, len);
             if (is_utf8_string((U8*)line, len))
                 SvUTF8_on(str);
             av_push(row, str);
@@ -341,27 +361,31 @@ AV* pattern_read_lines(const char* filename, HV* needed_lines)
     return ret;
 }
 
-SpookyHash *pattern_init_hash(UV seed1, UV seed2) {
-  SpookyHash *s = new SpookyHash;
-  s->Init(seed1, seed2);
-  return s;
+SpookyHash* pattern_init_hash(UV seed1, UV seed2)
+{
+    SpookyHash* s = new SpookyHash;
+    s->Init(seed1, seed2);
+    return s;
 }
 
-void pattern_add_to_hash(SpookyHash *s, SV *sv) {
-  size_t len;
-  char *data = SvPV(sv, len);
-  s->Update(data, len);
+void pattern_add_to_hash(SpookyHash* s, SV* sv)
+{
+    size_t len;
+    char* data = SvPV(sv, len);
+    s->Update(data, len);
 }
 
-AV *pattern_hash128(SpookyHash *s) {
-  uint64 h1, h2;
-  s->Final(&h1, &h2);
-  AV* ret = newAV();
-  av_push(ret, newSVuv(h1));
-  av_push(ret, newSVuv(h2));
-  return ret;
+AV* pattern_hash128(SpookyHash* s)
+{
+    uint64 h1, h2;
+    s->Final(&h1, &h2);
+    AV* ret = newAV();
+    av_push(ret, newSVuv(h1));
+    av_push(ret, newSVuv(h2));
+    return ret;
 }
 
-void destroy_hash(SpookyHash *s) {
-  delete s;
+void destroy_hash(SpookyHash* s)
+{
+    delete s;
 }
