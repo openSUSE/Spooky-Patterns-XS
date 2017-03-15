@@ -23,10 +23,23 @@ require Exporter;
 our @ISA    = qw(Exporter);
 our @EXPORT_OK = qw();
 
-our $VERSION = '1.12';
+our $VERSION = '1.20';
 
 require XSLoader;
 XSLoader::load('Spooky::Patterns::XS', $VERSION);
+
+package Spooky::Patterns::XS::Hash;
+
+sub hex {
+    my $self = shift;
+    my $hash = $self->hash128;
+    return sprintf("%x%x", $hash->[0], $hash->[1]);
+}
+
+sub hash64 {
+    my $self = shift;
+    return $self->hash128->[0];
+}
 
 1;
 

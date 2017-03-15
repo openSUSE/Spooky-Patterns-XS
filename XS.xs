@@ -7,11 +7,19 @@
 #include "patterns_impl.h"
 
 typedef Matcher *Spooky__Patterns__XS__Matcher;
+typedef SpookyHash *Spooky__Patterns__XS__Hash;
 
 MODULE = Spooky::Patterns::XS  PACKAGE = Spooky::Patterns::XS
 
 PROTOTYPES: ENABLE
 
+Spooky::Patterns::XS::Hash init_hash(UV seed1, UV seed2)
+  CODE:
+    RETVAL = pattern_init_hash(seed1, seed2);
+
+  OUTPUT:
+    RETVAL
+    
 AV *parse_tokens(const char *str)
   CODE:
     RETVAL = pattern_parse(str);
@@ -50,3 +58,19 @@ void DESTROY(Spooky::Patterns::XS::Matcher self)
  CODE:
   destroy_matcher(self);
 
+MODULE = Spooky::Patterns::XS  PACKAGE = Spooky::Patterns::XS::Hash PREFIX = Hash
+
+void DESTROY(Spooky::Patterns::XS::Hash self)
+ CODE:
+  destroy_hash(self);
+
+void add(Spooky::Patterns::XS::Hash self, SV *s)
+  CODE:
+    pattern_add_to_hash(self, s);
+
+AV *hash128(Spooky::Patterns::XS::Hash self)
+  CODE:
+    RETVAL = pattern_hash128(self);
+
+  OUTPUT:
+    RETVAL

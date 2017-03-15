@@ -340,3 +340,28 @@ AV* pattern_read_lines(const char* filename, HV* needed_lines)
     fclose(input);
     return ret;
 }
+
+SpookyHash *pattern_init_hash(UV seed1, UV seed2) {
+  SpookyHash *s = new SpookyHash;
+  s->Init(seed1, seed2);
+  return s;
+}
+
+void pattern_add_to_hash(SpookyHash *s, SV *sv) {
+  size_t len;
+  char *data = SvPV(sv, len);
+  s->Update(data, len);
+}
+
+AV *pattern_hash128(SpookyHash *s) {
+  uint64 h1, h2;
+  s->Final(&h1, &h2);
+  AV* ret = newAV();
+  av_push(ret, newSVuv(h1));
+  av_push(ret, newSVuv(h2));
+  return ret;
+}
+
+void destroy_hash(SpookyHash *s) {
+  delete s;
+}

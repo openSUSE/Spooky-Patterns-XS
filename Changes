@@ -1,5 +1,8 @@
 Revision history for Perl extension Spooky::Patterns::XS
 
+1.20    2017-03-15
+        - add Hash package for completness
+
 1.12    2017-03-14
         - upgrade read lines to utf-8
 

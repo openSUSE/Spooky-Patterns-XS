@@ -41,6 +41,7 @@ t/04license.t
 t/05readlines.1.txt
 t/05readlines.2.raw
 t/05readlines.t
+t/06hash.t
 typemap
 XS.pm
 XS.xs
