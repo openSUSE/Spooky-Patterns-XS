@@ -8,6 +8,7 @@ use File::Basename;
 use File::Find 'find';
 use Spooky::Patterns::XS;
 use Storable;
+use Time::HiRes 'time';
 
 plan skip_all => 'set DATA_ROOT to enable this test' unless $ENV{DATA_ROOT};
 
@@ -28,6 +29,10 @@ sub find_match {
     #print STDERR "FOUND $_: " . scalar(@$best) . "\n";
 }
 
+my $start = time;
+
 find(\&find_match, "$dataroot/unpacked/");
+
+print STDERR "Matches took " . (time - $start) . "\n";
 
 done_testing();
