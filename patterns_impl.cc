@@ -18,11 +18,11 @@
 #include "SpookyV2.h"
 #include "TokenTree.h"
 #include "XSUB.h"
-#include "perl.h"
 #include <cstring>
 #include <iostream>
 #include <list>
 #include <map>
+#include <perl.h>
 
 #define DEBUG 0
 
@@ -38,26 +38,17 @@ typedef std::vector<Token> TokenList;
 
 const int MAX_TOKEN_LENGTH = 100;
 
-struct Pattern {
-    TokenList tokens;
-    int id;
-};
-
-typedef std::vector<Pattern> PatternList;
-typedef std::map<uint64_t, PatternList> PatternHash;
-
 struct Matcher {
     TokenTree ignore_tree;
-    PatternHash patterns;
+    TokenTree pattern_tree;
 
     bool to_ignore(uint64_t t)
     {
-        return ignore_tree.find(t) != 0;
+        return ignore_tree.find(t);
     }
 
     Matcher()
     {
-        int index = 0;
         // typical comment and markup - have to be single tokens!
         static const char* ignored_tokens[] = { "/*", "*/", "//", "%", "%%", "dnl"
                                                                              "//**",
@@ -65,10 +56,13 @@ struct Matcher {
             "--", "#:", "\\", ">", "==", "::",
             "##", 0 };
 
+        static TokenTree dummy_next;
+
+        int index = 0;
         while (ignored_tokens[index]) {
             int len = strlen(ignored_tokens[index]);
             uint64_t h = SpookyHash::Hash64(ignored_tokens[index], len, 1);
-            ignore_tree.insert(h);
+            ignore_tree.insert(h, &dummy_next);
             index++;
         }
     }
@@ -141,6 +135,7 @@ void tokenize(Matcher* m, TokenList& result, char* str, int linenumber = 0)
 
 AV* pattern_parse(const char* str)
 {
+    // for the ignore tree
     Matcher m;
 
     TokenList t;
@@ -152,7 +147,7 @@ AV* pattern_parse(const char* str)
     int index = 0;
     for (TokenList::const_iterator it = t.begin(); it != t.end(); ++it) {
         // do not start with an expansion variable
-        if (!index && it->hash < 20)
+        if (!index && it->hash <= 20)
             continue;
         av_store(ret, index, newSVuv(it->hash));
         ++index;
@@ -162,68 +157,77 @@ AV* pattern_parse(const char* str)
 
 void pattern_add(Matcher* m, unsigned int id, av* tokens)
 {
-    Pattern p;
-    p.id = id;
-
     SSize_t len = av_top_index(tokens) + 1;
     if (!len) {
         std::cerr << "add failed for id " << id << std::endl;
         return;
     }
-    p.tokens.reserve(len);
 
-    uint64_t prime = SvUV(*av_fetch(tokens, 0, 0));
-    Token t;
-    for (SSize_t i = 1; i < len; ++i) {
+    TokenTree* current = &m->pattern_tree;
+
+    for (SSize_t i = 0; i < len; ++i) {
         SV* sv = *av_fetch(tokens, i, 0);
         UV uv = SvUV(sv);
-        t.hash = uv;
-        p.tokens.push_back(t);
-    }
 
-    m->patterns[prime].push_back(p);
+        if (uv <= 20) {
+            if (!current->skips[uv])
+                current->skips[uv] = new TokenTree;
+            current = current->skips[uv];
+        } else {
+            TokenTree* next = current->find(uv);
+            if (!next) {
+                next = new TokenTree;
+                current->insert(uv, next);
+            }
+            current = next;
+        }
+    }
+    if (current->pid) {
+        std::cout << "Problem: ID " << id << " overwrites " << current->pid << std::endl;
+    }
+    current->pid = id;
 }
 
-int check_token_matches(const TokenList& tokens, unsigned int offset, TokenList::const_iterator pat_iter, const TokenList::const_iterator& pat_end)
+int check_token_matches(const TokenList& tokens, unsigned int offset, const TokenTree* patterns, int* pid)
 {
-    while (pat_iter != pat_end) {
-        // pattern longer than text -> fail
-        if (offset >= tokens.size())
-            return 0;
+    int last_match = 0;
+    while (patterns) {
+        if (offset >= tokens.size()) {
+            // end of text, check if pattern ends too
+            if (patterns->pid) {
+                *pid = patterns->pid;
+                last_match = offset;
+            }
+            return last_match;
+        }
 
 #if DEBUG
-        fprintf(stderr, "MP %d %d:%s %lx-%lx\n", offset, tokens[offset].hash == pat_iter->hash, tokens[offset].text.c_str(), pat_iter->hash, tokens[offset].hash);
+        fprintf(stderr, "MP %d %d:%s\n", offset,
+            patterns->find(tokens[offset].hash) ? 1 : 0,
+            tokens[offset].text.c_str());
+#endif
+        for (int gap = 1; gap < 20; gap++) {
+            TokenTree* skip = patterns->skips[gap];
+            if (!skip)
+                continue;
+            for (int i = 1; i <= gap; ++i) {
+                int matched = check_token_matches(tokens, offset + i, skip, pid);
+#if DEBUG
+                fprintf(stderr, "MP2 SKIP %d:%d = %d %d\n", gap, i, matched, *pid);
 #endif
 
-        if (pat_iter->hash < 20) {
-            int max_gap = pat_iter->hash;
-            for (int i = 0; i <= max_gap; ++i) {
-                int matched = check_token_matches(tokens, offset + i, pat_iter + 1, pat_end);
                 if (matched)
                     return matched;
             }
-            return 0;
-        } else {
-            if (tokens[offset].hash != pat_iter->hash) {
-                return 0;
-            }
         }
+        if (patterns->pid) {
+            *pid = patterns->pid;
+            last_match = offset;
+        }
+        patterns = patterns->find(tokens[offset].hash);
         offset++;
-        pat_iter++;
     }
-    return offset;
-}
-
-int match_pattern(const TokenList& tokens, unsigned int offset, const Pattern& p)
-{
-    unsigned int index = 1; // the prime was already checked
-    TokenList::const_iterator pat_iter = p.tokens.begin();
-
-    index = check_token_matches(tokens, offset + index, pat_iter, p.tokens.end());
-    if (index)
-        return index - offset;
-    else
-        return 0;
+    return last_match;
 }
 
 struct Match {
@@ -263,24 +267,23 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
 
     Matches ms;
     for (unsigned int i = 0; i < ts.size(); i++) {
-        PatternHash::const_iterator it = m->patterns.find(ts[i].hash);
-        //std::cerr << ts[i].text << " " << (it == m->patterns.end()) << std::endl;
-        if (it == m->patterns.end())
-            continue;
-        PatternList::const_iterator it2 = it->second.begin();
-        //printf("T %s:%d:%lx %d %s\n", filename, ts[i].linenumber, ts[i].hash, it->second.size(), ts[i].text.c_str());
-        for (; it2 != it->second.end(); ++it2) {
-            int matched = match_pattern(ts, i, *it2);
-            if (matched) {
-                Match m;
-                m.start = i;
-                m.matched = matched;
-                m.pattern = it2->id;
+        TokenTree* patterns = m->pattern_tree.find(ts[i].hash);
 #if DEBUG
-                fprintf(stderr, "L %s:%d(%d)-%d(%d) id:%d\n", filename, ts[i].linenumber, i, ts[i + matched - 1].linenumber, m.matched, it2->id);
+//std::cerr << ts[i].text << " " << (patterns ? true : false) << std::endl;
 #endif
-                ms.push_back(m);
-            }
+        if (!patterns)
+            continue;
+        int pid = 0;
+        int matched = check_token_matches(ts, i + 1, patterns, &pid);
+        if (pid) {
+            Match m;
+            m.start = i;
+            m.matched = matched - i;
+            m.pattern = pid;
+#if DEBUG
+            fprintf(stderr, "L %s:%d(%d)-%d(%d) id:%d\n", filename, ts[i].linenumber, i, ts[i + matched - 1].linenumber, m.matched, m.pattern);
+#endif
+            ms.push_back(m);
         }
     }
     Matches bests;
