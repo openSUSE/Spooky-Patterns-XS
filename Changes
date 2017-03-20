@@ -1,5 +1,8 @@
 Revision history for Perl extension Spooky::Patterns::XS
 
+1.30    2017-03-15
+        - Optimized algorithm for lookup of patterns
+
 1.21    2017-03-15
         - make sure hex is always 32 bytes long
 

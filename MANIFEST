@@ -42,6 +42,8 @@ t/05readlines.1.txt
 t/05readlines.2.raw
 t/05readlines.t
 t/06hash.t
+t/test.t
+TokenTree.h
 typemap
 XS.pm
 XS.xs
