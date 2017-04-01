@@ -42,6 +42,8 @@ struct Matcher {
     TokenTree ignore_tree;
     TokenTree pattern_tree;
 
+    SSize_t longest_pattern;
+
     bool to_ignore(uint64_t t)
     {
         return ignore_tree.find(t);
@@ -65,6 +67,8 @@ struct Matcher {
             ignore_tree.insert(h, &dummy_next);
             index++;
         }
+
+        longest_pattern = 0;
     }
 };
 
@@ -183,9 +187,11 @@ void pattern_add(Matcher* m, unsigned int id, av* tokens)
         }
     }
     if (current->pid) {
-        std::cout << "Problem: ID " << id << " overwrites " << current->pid << std::endl;
+        std::cerr << "Problem: ID " << id << " overwrites " << current->pid << std::endl;
     }
     current->pid = id;
+    if (len > m->longest_pattern)
+        m->longest_pattern = len;
 }
 
 int check_token_matches(const TokenList& tokens, unsigned int offset, const TokenTree* patterns, int* pid)
@@ -234,6 +240,8 @@ struct Match {
     int start;
     int matched;
     int pattern;
+    int sline;
+    int eline;
 };
 
 // if either the start or the end of one region is within the other
@@ -248,6 +256,30 @@ bool match_overlap(int s1, int e1, int s2, int e2)
 
 typedef std::list<Match> Matches;
 
+void find_tokens(Matcher* m, TokenList& ts, Matches& ms, int tokenlist_offset, int tokenlist_index)
+{
+    TokenTree* patterns = m->pattern_tree.find(ts[tokenlist_index].hash);
+    if (!patterns)
+        return;
+    int pid = 0;
+    int matched = check_token_matches(ts, tokenlist_index + 1, patterns, &pid);
+    if (pid) {
+        Match m;
+        m.start = tokenlist_offset + tokenlist_index;
+        m.matched = matched - tokenlist_index;
+
+        m.sline = ts[tokenlist_index].linenumber;
+        m.eline = ts[matched - 1].linenumber;
+
+        m.pattern = pid;
+#if DEBUG
+        fprintf(stderr, "L %d(%d)-%d(%d) id:%d\n", ts[tokenlist_index].linenumber,
+            tokenlist_offset + tokenlist_index, ts[tokenlist_index + matched - 1].linenumber, m.matched, m.pattern);
+#endif
+        ms.push_back(m);
+    }
+}
+
 AV* pattern_find_matches(Matcher* m, const char* filename)
 {
     AV* ret = newAV();
@@ -260,32 +292,23 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
     char line[1000];
     int linenumber = 1;
     TokenList ts;
+    Matches ms;
+    int token_offset = 0;
     while (fgets(line, sizeof(line) - 1, input)) {
         tokenize(m, ts, line, linenumber++);
-    }
-    fclose(input);
-
-    Matches ms;
-    for (unsigned int i = 0; i < ts.size(); i++) {
-        TokenTree* patterns = m->pattern_tree.find(ts[i].hash);
-#if DEBUG
-//std::cerr << ts[i].text << " " << (patterns ? true : false) << std::endl;
-#endif
-        if (!patterns)
-            continue;
-        int pid = 0;
-        int matched = check_token_matches(ts, i + 1, patterns, &pid);
-        if (pid) {
-            Match m;
-            m.start = i;
-            m.matched = matched - i;
-            m.pattern = pid;
-#if DEBUG
-            fprintf(stderr, "L %s:%d(%d)-%d(%d) id:%d\n", filename, ts[i].linenumber, i, ts[i + matched - 1].linenumber, m.matched, m.pattern);
-#endif
-            ms.push_back(m);
+        // preserve memory
+        if (SSize_t(ts.size()) > m->longest_pattern * 100) {
+            unsigned int erasing = ts.size() - m->longest_pattern - 1;
+            for (unsigned int i = 0; i < erasing; i++)
+                find_tokens(m, ts, ms, token_offset, i);
+            ts.erase(ts.begin(), ts.begin() + erasing);
+            token_offset += erasing;
         }
     }
+    fclose(input);
+    for (unsigned int i = 0; i < ts.size(); i++)
+        find_tokens(m, ts, ms, token_offset, i);
+
     Matches bests;
     while (ms.size()) {
         Matches::const_iterator it = ms.begin();
@@ -315,8 +338,8 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
     for (Matches::const_iterator it = bests.begin(); it != bests.end(); ++it, ++index) {
         AV* line = newAV();
         av_push(line, newSVuv(it->pattern));
-        av_push(line, newSVuv(ts[it->start].linenumber));
-        av_push(line, newSVuv(ts[it->start + it->matched - 1].linenumber));
+        av_push(line, newSVuv(it->sline));
+        av_push(line, newSVuv(it->eline));
         av_push(ret, newRV_noinc((SV*)line));
     }
     return ret;
