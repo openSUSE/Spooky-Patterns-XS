@@ -62,7 +62,7 @@ public:
     const TokenTree& operator=(const TokenTree& rhs);
 
     int pid;
-    TokenTree* skips[20];
+    TokenTree* skips[21];
 
 private:
     AANode* root;
@@ -91,7 +91,7 @@ TokenTree::TokenTree()
     nullNode->level = 0;
     root = nullNode;
     pid = 0;
-    for (int i = 0; i < 20; i++)
+    for (int i = 0; i <= 20; i++)
         skips[i] = NULL;
 }
 

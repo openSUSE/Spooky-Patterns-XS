@@ -206,7 +206,7 @@ int check_token_matches(const TokenList& tokens, unsigned int offset, const Toke
             patterns->find(tokens[offset].hash) ? 1 : 0,
             tokens[offset].text.c_str());
 #endif
-        for (int gap = 1; gap < 20; gap++) {
+        for (int gap = 1; gap <= 20; gap++) {
             TokenTree* skip = patterns->skips[gap];
             if (!skip)
                 continue;
