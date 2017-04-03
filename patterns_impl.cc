@@ -159,6 +159,23 @@ AV* pattern_parse(const char* str)
     return ret;
 }
 
+TokenTree* check_or_insert_skip(SkipList& sl, unsigned char uv)
+{
+    SkipList::const_iterator last = sl.before_begin();
+
+    if (!sl.empty()) {
+        SkipList::const_iterator sli = sl.begin();
+        for (; sli != sl.end(); ++sli) {
+            if (sli->first == uv)
+                return sli->second;
+            if (sli->first > uv)
+                break;
+            last = sli;
+        }
+    }
+    return sl.insert_after(last, std::make_pair(uv, new TokenTree))->second;
+}
+
 void pattern_add(Matcher* m, unsigned int id, av* tokens)
 {
     SSize_t len = av_top_index(tokens) + 1;
@@ -174,9 +191,7 @@ void pattern_add(Matcher* m, unsigned int id, av* tokens)
         UV uv = SvUV(sv);
 
         if (uv <= 20) {
-            if (!current->skips[uv])
-                current->skips[uv] = new TokenTree;
-            current = current->skips[uv];
+            current = check_or_insert_skip(current->skips, uv);
         } else {
             TokenTree* next = current->find(uv);
             if (!next) {
@@ -212,14 +227,12 @@ int check_token_matches(const TokenList& tokens, unsigned int offset, const Toke
             patterns->find(tokens[offset].hash) ? 1 : 0,
             tokens[offset].text.c_str());
 #endif
-        for (int gap = 1; gap <= 20; gap++) {
-            TokenTree* skip = patterns->skips[gap];
-            if (!skip)
-                continue;
-            for (int i = 1; i <= gap; ++i) {
-                int matched = check_token_matches(tokens, offset + i, skip, pid);
+
+        for (SkipList::const_iterator it = patterns->skips.begin(); it != patterns->skips.end(); ++it) {
+            for (int i = 1; i <= it->first; ++i) {
+                int matched = check_token_matches(tokens, offset + i, it->second, pid);
 #if DEBUG
-                fprintf(stderr, "MP2 SKIP %d:%d = %d %d\n", gap, i, matched, *pid);
+                fprintf(stderr, "MP2 SKIP %d:%d = %d %d\n", it->first, i, matched, *pid);
 #endif
 
                 if (matched)

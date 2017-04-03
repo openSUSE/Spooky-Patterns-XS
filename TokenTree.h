@@ -3,6 +3,7 @@
 
 /* This is based on AATree of the C++ data structure book */
 
+#include <forward_list>
 #include <iostream> // For NULL
 #include <string>
 
@@ -47,6 +48,8 @@ class AANode {
     friend class TokenTree;
 };
 
+typedef std::forward_list<std::pair<unsigned char, TokenTree*> > SkipList;
+
 class TokenTree {
 public:
     TokenTree();
@@ -62,7 +65,7 @@ public:
     const TokenTree& operator=(const TokenTree& rhs);
 
     int pid;
-    TokenTree* skips[21];
+    SkipList skips;
 
 private:
     AANode* root;
@@ -91,8 +94,6 @@ TokenTree::TokenTree()
     nullNode->level = 0;
     root = nullNode;
     pid = 0;
-    for (int i = 0; i <= 20; i++)
-        skips[i] = NULL;
 }
 
 /* 
