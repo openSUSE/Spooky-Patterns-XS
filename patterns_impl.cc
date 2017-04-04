@@ -230,13 +230,16 @@ int check_token_matches(const TokenList& tokens, unsigned int offset, const Toke
 
         for (SkipList::const_iterator it = patterns->skips.begin(); it != patterns->skips.end(); ++it) {
             for (int i = 1; i <= it->first; ++i) {
-                int matched = check_token_matches(tokens, offset + i, it->second, pid);
+                int cpid = 0;
+                int matched = check_token_matches(tokens, offset + i, it->second, &cpid);
 #if DEBUG
-                fprintf(stderr, "MP2 SKIP %d:%d = %d %d\n", it->first, i, matched, *pid);
+                fprintf(stderr, "MP2 SKIP %d:%d = %d %d\n", it->first, i, matched, cpid);
 #endif
 
-                if (matched)
-                    return matched;
+                if (last_match < matched) {
+                    last_match = matched;
+                    *pid = cpid;
+                }
             }
         }
         if (patterns->pid) {
