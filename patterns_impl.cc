@@ -209,13 +209,13 @@ void pattern_add(Matcher* m, unsigned int id, av* tokens)
         m->longest_pattern = len;
 }
 
-int check_token_matches(const TokenList& tokens, unsigned int offset, const TokenTree* patterns, int* pid)
+unsigned int check_token_matches(const TokenList& tokens, unsigned int offset, const TokenTree* patterns, int* pid)
 {
-    int last_match = 0;
+    unsigned int last_match = 0;
     while (patterns) {
         if (offset >= tokens.size()) {
             // end of text, check if pattern ends too
-            if (patterns->pid) {
+            if (patterns->pid && last_match < offset) {
                 *pid = patterns->pid;
                 last_match = offset;
             }
@@ -231,9 +231,9 @@ int check_token_matches(const TokenList& tokens, unsigned int offset, const Toke
         for (SkipList::const_iterator it = patterns->skips.begin(); it != patterns->skips.end(); ++it) {
             for (int i = 1; i <= it->first; ++i) {
                 int cpid = 0;
-                int matched = check_token_matches(tokens, offset + i, it->second, &cpid);
+                unsigned int matched = check_token_matches(tokens, offset + i, it->second, &cpid);
 #if DEBUG
-                fprintf(stderr, "MP2 SKIP %d:%d = %d %d\n", it->first, i, matched, cpid);
+                fprintf(stderr, "MP2 %d SKIP %d:%d = %d %d\n", offset, it->first, i, matched, cpid);
 #endif
 
                 if (last_match < matched) {
@@ -242,8 +242,8 @@ int check_token_matches(const TokenList& tokens, unsigned int offset, const Toke
                 }
             }
         }
-        if (patterns->pid) {
-            *pid = patterns->pid;
+        if (patterns->pid && last_match < offset) {
+	    *pid = patterns->pid;
             last_match = offset;
         }
         patterns = patterns->find(tokens[offset].hash);
