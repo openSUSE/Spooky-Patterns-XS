@@ -52,11 +52,11 @@ struct Matcher {
     Matcher()
     {
         // typical comment and markup - have to be single tokens!
-        static const char* ignored_tokens[] = { "/*", "*/", "//", "%", "%%", "dnl"
-                                                                             "//**",
-            "/**", "**", "#~", ";;", "\"\"",
-            "--", "#:", "\\", ">", "==", "::",
-            "##", 0 };
+        static const char* ignored_tokens[] = {
+            "/*", "*/", "//", "%", "%%", "dnl", "//**",
+            "/**", "**", "#~", ";;", "\"\"", "--", "#:",
+            "\\", ">", "==", "::", "##", 0
+        };
 
         static TokenTree dummy_next;
 
@@ -243,7 +243,7 @@ unsigned int check_token_matches(const TokenList& tokens, unsigned int offset, c
             }
         }
         if (patterns->pid && last_match < offset) {
-	    *pid = patterns->pid;
+            *pid = patterns->pid;
             last_match = offset;
         }
         patterns = patterns->find(tokens[offset].hash);
