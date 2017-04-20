@@ -6,7 +6,7 @@ use File::Spec::Functions;
 my (@INC, @LIBPATH, @LIBS);
 
 my $DEFINES = '-O2';
-$DEFINES .= ' -Wall -Wno-unused-value -Wno-format-security';
+$DEFINES .= ' -Wall -Wno-unused-value -Wno-format-security -std=c++11';
 
 unshift @INC, '-I. -I.. -Isrc';
 
