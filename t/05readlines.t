@@ -11,7 +11,13 @@ my $ret = Spooky::Patterns::XS::read_lines('t/03match.txt', { 4 => 1 });
 cmp_deeply($ret, [[4,1,'Hello world, this is a test']], 'read_lines returns line 4');
 
 $ret = Spooky::Patterns::XS::read_lines('t/05readlines.1.txt', { 1 => 1 });
-cmp_deeply($ret, [[1,1,"la araña is a böses Tier"]], 'read_lines returns line 4');
+# read_lines only returns chars, so we need to check utf-8 here
+my $str = $ret->[0]->[2];
+is(utf8::is_utf8($str) ? 1 : 0, 0, 'not returned as utf-8');
+utf8::decode($str);
+is($str, "la araña is a böses Tier", 'unicode string');
+$ret->[0]->[2] = 'UTF-8';
+cmp_deeply($ret, [[1,1,'UTF-8']], 'read_lines returns line 4');
 
 # I'm unable to find a good way to find out the returned string doesn't produce errors
 # when printed - just don't crash
