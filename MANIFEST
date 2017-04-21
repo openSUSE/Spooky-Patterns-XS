@@ -13,6 +13,7 @@ t/03match.txt
 t/04license.1.pattern
 t/04license.1.txt
 t/04license.10.pattern
+t/04license.10.txt
 t/04license.11.pattern
 t/04license.12.pattern
 t/04license.13.pattern
@@ -24,6 +25,9 @@ t/04license.18.pattern
 t/04license.19.pattern
 t/04license.2.pattern
 t/04license.2.txt
+t/04license.20.pattern
+t/04license.21.pattern
+t/04license.22.pattern
 t/04license.3.pattern
 t/04license.3.txt
 t/04license.4.pattern
@@ -37,11 +41,15 @@ t/04license.7.txt
 t/04license.8.pattern
 t/04license.8.txt
 t/04license.9.pattern
+t/04license.9.txt
 t/04license.t
 t/05readlines.1.txt
 t/05readlines.2.raw
 t/05readlines.t
 t/06hash.t
+t/07close.p1
+t/07close.p2
+t/07close.t
 t/test.t
 TokenTree.h
 typemap

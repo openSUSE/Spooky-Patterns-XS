@@ -27,6 +27,20 @@ AV *parse_tokens(const char *str)
   OUTPUT:
     RETVAL
 
+AV *normalize(const char *str)
+  CODE:
+    RETVAL = pattern_normalize(str);
+
+  OUTPUT:
+    RETVAL
+
+int distance(AV *a1, AV *a2)
+  CODE:
+    RETVAL = pattern_distance(a1, a2);
+
+  OUTPUT:
+    RETVAL
+
 Spooky::Patterns::XS::Matcher init_matcher()
   CODE:
    RETVAL = pattern_init_matcher();

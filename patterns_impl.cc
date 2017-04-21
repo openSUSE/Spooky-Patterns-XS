@@ -18,6 +18,7 @@
 #include "SpookyV2.h"
 #include "TokenTree.h"
 #include "XSUB.h"
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <list>
@@ -29,9 +30,7 @@
 struct Token {
     int linenumber;
     uint64_t hash;
-#if DEBUG
     std::string text;
-#endif
 };
 
 typedef std::vector<Token> TokenList;
@@ -88,9 +87,7 @@ static void add_token(Matcher* m, TokenList& result, const char* start, size_t l
         return;
 
     Token t;
-#if DEBUG
     t.text = std::string(start, len);
-#endif
     t.linenumber = line;
     t.hash = 0;
     if (!line && len > 5 && len < 9 && !strncmp(start, "$skip", 5)) {
@@ -428,4 +425,85 @@ AV* pattern_hash128(SpookyHash* s)
 void destroy_hash(SpookyHash* s)
 {
     delete s;
+}
+
+static int _LevenshteinDistance(AV* s, int len_s, AV* t, int len_t)
+{
+    // degenerate cases
+    if (len_s == 0)
+        return len_t;
+    if (len_t == 0)
+        return len_s;
+
+    // create two work vectors of integer distances
+    int64_t* v0 = new int64_t[len_t + 1];
+    int64_t* v1 = new int64_t[len_t + 1];
+
+    // initialize v0 (the previous row of distances)
+    // this row is A[0][i]: edit distance for an empty s
+    // the distance is just the number of characters to delete from t
+    for (int i = 0; i < len_t + 1; i++)
+        v0[i] = i;
+
+    for (int i = 0; i < len_s; i++) {
+        // calculate v1 (current row distances) from the previous row v0
+
+        // first element of v1 is A[i+1][0]
+        //   edit distance is delete (i+1) chars from s to match empty t
+        v1[0] = i + 1;
+        AV* av1 = (AV*)SvRV(*av_fetch(s, i, 0));
+        SV* sv1 = *av_fetch((AV*)av1, 2, 0);
+        //fprintf(stderr, "sv %ld\n", SvUV(sv1));
+
+        // use formula to fill in the rest of the row
+        for (int j = 0; j < len_t; j++) {
+            AV* av2 = (AV*)SvRV(*av_fetch(t, j, 0));
+            SV* sv2 = *av_fetch((AV*)av2, 2, 0);
+
+            int cost = (SvUV(sv1) == SvUV(sv2)) ? 0 : 1;
+            v1[j + 1] = std::min(std::min(v1[j] + 1, v0[j + 1] + 1), v0[j] + cost);
+        }
+
+        // copy v1 (current row) to v0 (previous row) for next iteration
+        for (int j = 0; j < len_t + 1; j++)
+            v0[j] = v1[j];
+    }
+
+    return v1[len_t];
+}
+
+int pattern_distance(AV* a1, AV* a2)
+{
+    return _LevenshteinDistance(a1, av_len(a1), a2, av_len(a2));
+}
+
+AV* pattern_normalize(const char* p)
+{
+    Matcher m;
+    TokenList t;
+    int line = 1;
+    while (true) {
+        const char* nl = strchr(p, '\n');
+        char* copy;
+        if (nl)
+            copy = strndup(p, nl - p);
+        else
+            copy = strdup(p);
+        tokenize(&m, t, copy, line++);
+        free(copy);
+        if (!nl)
+            break;
+        p = nl + 1;
+    }
+
+    AV* ret = newAV();
+    for (TokenList::const_iterator it = t.begin(); it != t.end(); ++it) {
+        AV* row = newAV();
+        av_push(row, newSVuv(it->linenumber));
+        SV* str = newSVpv(it->text.data(), it->text.length());
+        av_push(row, str);
+        av_push(row, newSVuv(it->hash));
+        av_push(ret, newRV_noinc((SV*)row));
+    }
+    return ret;
 }

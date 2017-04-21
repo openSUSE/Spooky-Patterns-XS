@@ -13,21 +13,23 @@
 // You should have received a copy of the GNU General Public License along
 // with this program; if not, see <http://www.gnu.org/licenses/>.
 
-#include <string>
-#include <vector>
 #include "EXTERN.h"
 #include "perl.h"
+#include <string>
+#include <vector>
 
 // map string into token array
-AV *pattern_parse(const char *str);
+AV* pattern_parse(const char* str);
+AV* pattern_normalize(const char* str);
+int pattern_distance(AV* a1, AV* a2);
 struct Matcher;
 class SpookyHash;
-Matcher *pattern_init_matcher();
-void pattern_add(Matcher *m, unsigned id, AV *tokens);
-AV *pattern_find_matches(Matcher *m, const char *filename);
-void destroy_matcher(Matcher *m);
-AV *pattern_read_lines(const char *filename, HV *needed);
-SpookyHash *pattern_init_hash(UV seed1, UV seed2);
-void pattern_add_to_hash(SpookyHash *s, SV *sv);
-void destroy_hash(SpookyHash *s);
-AV *pattern_hash128(SpookyHash *s);
+Matcher* pattern_init_matcher();
+void pattern_add(Matcher* m, unsigned id, AV* tokens);
+AV* pattern_find_matches(Matcher* m, const char* filename);
+void destroy_matcher(Matcher* m);
+AV* pattern_read_lines(const char* filename, HV* needed);
+SpookyHash* pattern_init_hash(UV seed1, UV seed2);
+void pattern_add_to_hash(SpookyHash* s, SV* sv);
+void destroy_hash(SpookyHash* s);
+AV* pattern_hash128(SpookyHash* s);
