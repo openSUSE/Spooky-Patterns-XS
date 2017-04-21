@@ -14,11 +14,10 @@
 // with this program; if not, see <http://www.gnu.org/licenses/>.
 
 #include "patterns_impl.h"
-#include "EXTERN.h"
+#include <EXTERN.h>
 #include "SpookyV2.h"
 #include "TokenTree.h"
-#include "XSUB.h"
-#include <algorithm>
+#include <XSUB.h>
 #include <cstring>
 #include <iostream>
 #include <list>
