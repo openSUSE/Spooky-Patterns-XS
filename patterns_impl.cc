@@ -35,6 +35,7 @@ struct Token {
 typedef std::vector<Token> TokenList;
 
 const int MAX_TOKEN_LENGTH = 100;
+const int MAX_LINE_SIZE = 8000;
 
 struct Matcher {
     TokenTree ignore_tree;
@@ -301,7 +302,7 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
         std::cerr << "Failed to open " << filename << std::endl;
         return ret;
     }
-    char line[1000];
+    char line[MAX_LINE_SIZE];
     int linenumber = 1;
     TokenList ts;
     Matches ms;
@@ -368,7 +369,7 @@ AV* pattern_read_lines(const char* filename, HV* needed_lines)
     }
     // really long file :)
     char buffer[200];
-    char line[1000];
+    char line[MAX_LINE_SIZE];
     int linenumber = 1;
     TokenList ts;
     while (fgets(line, sizeof(line) - 1, input)) {
