@@ -25,6 +25,7 @@
 #include <perl.h>
 
 #define DEBUG 0
+#define MAX_SKIP 99
 
 struct Token {
     int linenumber;
@@ -96,14 +97,14 @@ static void add_token(Matcher* m, TokenList& result, const char* start, size_t l
         number[len - 5] = 0;
         char* endptr;
         t.hash = strtol(number, &endptr, 10);
-        if (*endptr || t.hash > 20) // more than just a number
+        if (*endptr || t.hash > MAX_SKIP) // more than just a number
             t.hash = 0;
     }
     if (!t.hash) {
         // hash64 has no collisions on our patterns and is very fast
-        // *and* 0-20 are "free"
+        // *and* 0-3000 (at least) are "free"
         t.hash = SpookyHash::Hash64(start, len, 1);
-        assert(t.hash > 20);
+        assert(t.hash > MAX_SKIP);
         if (m->to_ignore(t.hash))
             return;
     }
@@ -148,7 +149,7 @@ AV* pattern_parse(const char* str)
     int index = 0;
     for (TokenList::const_iterator it = t.begin(); it != t.end(); ++it) {
         // do not start with an expansion variable
-        if (!index && it->hash <= 20)
+        if (!index && it->hash <= MAX_SKIP)
             continue;
         av_store(ret, index, newSVuv(it->hash));
         ++index;
@@ -187,7 +188,7 @@ void pattern_add(Matcher* m, unsigned int id, av* tokens)
         SV* sv = *av_fetch(tokens, i, 0);
         UV uv = SvUV(sv);
 
-        if (uv <= 20) {
+        if (uv <= MAX_SKIP) {
             current = check_or_insert_skip(current->skips, uv);
         } else {
             TokenTree* next = current->find(uv);
