@@ -52,8 +52,8 @@ struct Matcher {
     {
         // typical comment and markup - have to be single tokens!
         static const char* ignored_tokens[] = {
-            "/*", "*/", "//", "%", "%%", "dnl", "//**",
-            "/**", "**", "#~", ";;", "\"\"", "--", "#:",
+            "/", "//", "%", "%%", "dnl",
+            "#~", ";;", "\"\"", "--", "#:",
             "\\", ">", "==", "::", "##", 0
         };
 
@@ -112,8 +112,8 @@ static void add_token(Matcher* m, TokenList& result, const char* start, size_t l
 
 void tokenize(Matcher* m, TokenList& result, char* str, int linenumber = 0)
 {
-    static const char* ignore_seps = " \r\n\t*;,:!#{}|";
-    static const char* single_seps = "-.+?\"\'=";
+    static const char* ignore_seps = " \r\n\t*;,:!#{}()[]|";
+    static const char* single_seps = "-.+?\"\'`=<>";
 
     const char* start = str;
 

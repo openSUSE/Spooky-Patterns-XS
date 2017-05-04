@@ -12,27 +12,29 @@ use Time::HiRes 'time';
 
 plan skip_all => 'set DATA_ROOT to enable this test' unless $ENV{DATA_ROOT};
 
-my $m = Spooky::Patterns::XS::init_matcher();
+my $m        = Spooky::Patterns::XS::init_matcher();
 my $dataroot = $ENV{DATA_ROOT};
 
 for my $fn ( glob("$dataroot/patterns/*") ) {
     my $tok = retrieve($fn);
     my $num = basename($fn);
-    $m->add_pattern( $num, $tok);
+    $m->add_pattern( $num, $tok );
 }
-ok(1, "Loaded patterns");
+ok( 1, "Loaded patterns" );
 
 sub find_match {
+
     #return unless $_ eq 'LICENSE';
     return unless -f $_;
     my $best = $m->find_matches($_);
+
     #print STDERR "FOUND $_: " . scalar(@$best) . "\n";
 }
 
 my $start = time;
 
-find(\&find_match, "$dataroot/unpacked/");
+find( \&find_match, "$dataroot/unpacked/" );
 
-print STDERR "Matches took " . (time - $start) . "\n";
+print STDERR "Matches took " . ( time - $start ) . "\n";
 
 done_testing();
