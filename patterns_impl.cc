@@ -14,9 +14,9 @@
 // with this program; if not, see <http://www.gnu.org/licenses/>.
 
 #include "patterns_impl.h"
-#include <EXTERN.h>
 #include "SpookyV2.h"
 #include "TokenTree.h"
+#include <EXTERN.h>
 #include <XSUB.h>
 #include <cstring>
 #include <iostream>
@@ -158,11 +158,14 @@ AV* pattern_parse(const char* str)
     return ret;
 }
 
-TokenTree* check_or_insert_skip(SkipList& sl, unsigned char uv)
+TokenTree* check_or_insert_skip(TokenTree* current, unsigned char uv)
 {
-    SkipList::const_iterator last = sl.before_begin();
+    SkipList::const_iterator last;
 
-    if (!sl.empty()) {
+    if (current->skips) {
+        SkipList& sl = *current->skips;
+        last = sl.before_begin();
+
         SkipList::const_iterator sli = sl.begin();
         for (; sli != sl.end(); ++sli) {
             if (sli->first == uv)
@@ -171,8 +174,11 @@ TokenTree* check_or_insert_skip(SkipList& sl, unsigned char uv)
                 break;
             last = sli;
         }
+    } else {
+        current->skips = new SkipList;
+        last = current->skips->before_begin();
     }
-    return sl.insert_after(last, std::make_pair(uv, new TokenTree))->second;
+    return current->skips->insert_after(last, std::make_pair(uv, new TokenTree))->second;
 }
 
 void pattern_add(Matcher* m, unsigned int id, av* tokens)
@@ -190,7 +196,7 @@ void pattern_add(Matcher* m, unsigned int id, av* tokens)
         UV uv = SvUV(sv);
 
         if (uv <= MAX_SKIP) {
-            current = check_or_insert_skip(*current->skips, uv);
+            current = check_or_insert_skip(current, uv);
         } else {
             TokenTree* next = current->find(uv);
             if (!next) {
@@ -227,17 +233,19 @@ unsigned int check_token_matches(const TokenList& tokens, unsigned int offset, c
             tokens[offset].text.c_str());
 #endif
 
-        for (SkipList::const_iterator it = patterns->skips->begin(); it != patterns->skips->end(); ++it) {
-            for (int i = 1; i <= it->first; ++i) {
-                int cpid = 0;
-                unsigned int matched = check_token_matches(tokens, offset + i, it->second, &cpid);
+        if (patterns->skips) {
+            for (SkipList::const_iterator it = patterns->skips->begin(); it != patterns->skips->end(); ++it) {
+                for (int i = 1; i <= it->first; ++i) {
+                    int cpid = 0;
+                    unsigned int matched = check_token_matches(tokens, offset + i, it->second, &cpid);
 #if DEBUG
-                fprintf(stderr, "MP2 %d SKIP %d:%d = %d %d\n", offset, it->first, i, matched, cpid);
+                    fprintf(stderr, "MP2 %d SKIP %d:%d = %d %d\n", offset, it->first, i, matched, cpid);
 #endif
 
-                if (last_match < matched) {
-                    last_match = matched;
-                    *pid = cpid;
+                    if (last_match < matched) {
+                        last_match = matched;
+                        *pid = cpid;
+                    }
                 }
             }
         }
@@ -362,113 +370,110 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
 
 void pattern_dump(Matcher* m, const char* filename)
 {
-  FILE *file = fopen(filename, "wb");
-  fwrite(&m->longest_pattern, sizeof(m->longest_pattern), 1, file);
+    FILE* file = fopen(filename, "wb");
+    fwrite(&m->longest_pattern, sizeof(m->longest_pattern), 1, file);
 
-  SerializeInfo si;
-  
-  m->pattern_tree.mark_elements(si);
-  fwrite(&si.tree_count, sizeof(si.tree_count), 1, file);
-  fwrite(&si.node_count, sizeof(si.tree_count), 1, file);
-  fwrite(&si.element_count, sizeof(si.tree_count), 1, file);
+    SerializeInfo si;
 
-  // elements are quick
-  uint64_t *elements = new uint64_t[si.element_count];
-  for (std::map<uint64_t, int>::const_iterator it = si.elements.begin(); it != si.elements.end(); it++) {
-    elements[it->second] = it->first;
-  }
-  fwrite(elements, sizeof(uint64_t), si.element_count, file);
-  delete [] elements;
+    m->pattern_tree.mark_elements(si);
+    fwrite(&si.tree_count, sizeof(si.tree_count), 1, file);
+    fwrite(&si.node_count, sizeof(si.tree_count), 1, file);
+    fwrite(&si.element_count, sizeof(si.tree_count), 1, file);
 
-  // trees reference nodes and are recursive
-  const TokenTree **trees = new const TokenTree*[si.tree_count];
-  memset(trees, 0, si.tree_count * sizeof(TokenTree*));
-  for (std::map<const TokenTree *, int>::const_iterator it = si.trees.begin();
-       it != si.trees.end(); it++)
-    {
-      trees[it->second] = it->first;
+    // elements are quick
+    uint64_t* elements = new uint64_t[si.element_count];
+    for (std::map<uint64_t, int>::const_iterator it = si.elements.begin(); it != si.elements.end(); it++) {
+        elements[it->second] = it->first;
     }
-  
-  for (int i = 0; i < si.tree_count; i++) {
-    const TokenTree *t = trees[i];
-    fwrite(&t->pid, sizeof(t->pid), 1, file);
-    char skip_count = 0;
-    // forward_list has no length - but is cheap
-    for (SkipList::const_iterator it = t->skips->begin(); it != t->skips->end(); ++it)
-      skip_count++;
-    fwrite(&skip_count, 1, 1, file);
-    for (SkipList::const_iterator it = t->skips->begin(); it != t->skips->end(); ++it) {
-      fwrite(&it->first, 1, 1, file);
-      int32_t index = si.trees[it->second];
-      fwrite(&index, sizeof(int32_t), 1, file);
-    }
-    int32_t index = si.nodes[t->root];
-    fwrite(&index, sizeof(int32_t), 1, file);
-  }
-  delete [] trees;
+    fwrite(elements, sizeof(uint64_t), si.element_count, file);
+    delete[] elements;
 
-  // trees reference nodes and are recursive
-  const AANode **nodes = new const AANode*[si.node_count];
-  memset(nodes, 0, si.node_count * sizeof(AANode*));
-  for (std::map<const AANode *, int>::const_iterator it = si.nodes.begin();
-       it != si.nodes.end(); it++)
-    {
-      nodes[it->second] = it->first;
+    // trees reference nodes and are recursive
+    const TokenTree** trees = new const TokenTree*[si.tree_count];
+    memset(trees, 0, si.tree_count * sizeof(TokenTree*));
+    for (std::map<const TokenTree*, int>::const_iterator it = si.trees.begin();
+         it != si.trees.end(); it++) {
+        trees[it->second] = it->first;
     }
-  for (int i = 0; i < si.node_count; i++) {
-    const AANode *n = nodes[i];
-    int32_t index = si.nodes[n->left];
-    fwrite(&index, sizeof(int32_t), 1, file);
-    index = si.nodes[n->right];
-    fwrite(&index, sizeof(int32_t), 1, file);
-    fwrite(&n->level, sizeof(n->level), 1, file);
-    index = si.trees[n->next_token];
-    fwrite(&index, sizeof(int32_t), 1, file);
-  }
-  
-  delete [] nodes;
-  
-  std::cout << "count " << si.element_count << " " << si.node_count  << std::endl;
-  fclose(file);
+
+    for (int i = 0; i < si.tree_count; i++) {
+        const TokenTree* t = trees[i];
+        fwrite(&t->pid, sizeof(t->pid), 1, file);
+        char skip_count = 0;
+        // forward_list has no length - but is cheap
+        for (SkipList::const_iterator it = t->skips->begin(); it != t->skips->end(); ++it)
+            skip_count++;
+        fwrite(&skip_count, 1, 1, file);
+        for (SkipList::const_iterator it = t->skips->begin(); it != t->skips->end(); ++it) {
+            fwrite(&it->first, 1, 1, file);
+            int32_t index = si.trees[it->second];
+            fwrite(&index, sizeof(int32_t), 1, file);
+        }
+        int32_t index = si.nodes[t->root];
+        fwrite(&index, sizeof(int32_t), 1, file);
+    }
+    delete[] trees;
+
+    // trees reference nodes and are recursive
+    const AANode** nodes = new const AANode*[si.node_count];
+    memset(nodes, 0, si.node_count * sizeof(AANode*));
+    for (std::map<const AANode*, int>::const_iterator it = si.nodes.begin();
+         it != si.nodes.end(); it++) {
+        nodes[it->second] = it->first;
+    }
+    for (int i = 0; i < si.node_count; i++) {
+        const AANode* n = nodes[i];
+        int32_t index = si.nodes[n->left];
+        fwrite(&index, sizeof(int32_t), 1, file);
+        index = si.nodes[n->right];
+        fwrite(&index, sizeof(int32_t), 1, file);
+        fwrite(&n->level, sizeof(n->level), 1, file);
+        index = si.trees[n->next_token];
+        fwrite(&index, sizeof(int32_t), 1, file);
+    }
+
+    delete[] nodes;
+
+    std::cout << "count " << si.element_count << " " << si.node_count << std::endl;
+    fclose(file);
 }
 
 void pattern_load(Matcher* m, const char* filename)
 {
-  int fd = open(filename, O_RDONLY);
-  if (fd < 0)
-    {
-      fprintf(stderr, "Couldn't open %s\n", filename);
-      return;
+    int fd = open(filename, O_RDONLY);
+    if (fd < 0) {
+        fprintf(stderr, "Couldn't open %s\n", filename);
+        return;
     }
-  struct stat attr;
-  if(fstat(fd, &attr) == -1) {
-    fprintf(stderr, "Error accessing %s\n", filename);
-    return;
-  }
-  char *dump = (char*)mmap(NULL, attr.st_size, PROT_READ, MAP_PRIVATE|MAP_POPULATE, fd, 0);
+    struct stat attr;
+    if (fstat(fd, &attr) == -1) {
+        fprintf(stderr, "Error accessing %s\n", filename);
+        return;
+    }
+    char* dump = (char*)mmap(NULL, attr.st_size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
 
-  m->longest_pattern = *reinterpret_cast<SSize_t*>(dump);
-  dump += sizeof(SSize_t);
-  
-  SerializeInfo si;
+    m->longest_pattern = *reinterpret_cast<SSize_t*>(dump);
+    dump += sizeof(SSize_t);
 
-  si.tree_count = *reinterpret_cast<int32_t*>(dump);
-  dump += sizeof(int32_t);
-  si.node_count = *reinterpret_cast<int32_t*>(dump);
-  dump += sizeof(int32_t);
-  si.element_count = *reinterpret_cast<int32_t*>(dump);
-  dump += sizeof(int32_t);
+    SerializeInfo si;
 
-  uint64_t *elements = reinterpret_cast<uint64_t *>(dump);
-  dump += sizeof(uint64_t) * si.element_count;
+    si.tree_count = *reinterpret_cast<int32_t*>(dump);
+    dump += sizeof(int32_t);
+    si.node_count = *reinterpret_cast<int32_t*>(dump);
+    dump += sizeof(int32_t);
+    si.element_count = *reinterpret_cast<int32_t*>(dump);
+    dump += sizeof(int32_t);
+
+    uint64_t* elements = reinterpret_cast<uint64_t*>(dump);
+    dump += sizeof(uint64_t) * si.element_count;
 
 #if 1
-  TokenTree **trees = new TokenTree*[si.tree_count];
-  for (int i = 0; i < si.tree_count; i++)
-    trees[i] = new TokenTree(m->pattern_tree.nullNode);
+    TokenTree** trees = new TokenTree*[si.tree_count];
+    for (int i = 0; i < si.tree_count; i++)
+        trees[i] = new TokenTree(m->pattern_tree.nullNode);
 #endif
-  
-  std::cout << "count " << si.element_count << " " << si.node_count  << " " << si.tree_count << std::endl;
+
+    std::cout << "count " << si.element_count << " " << si.node_count << " " << si.tree_count << std::endl;
 #if 0
   for (int i = 0; i < si.tree_count; i++) {
     TokenTree *t = trees[i];
@@ -513,8 +518,8 @@ void pattern_load(Matcher* m, const char* filename)
 
   delete [] nodes;
   delete [] trees;
-#endif  
-  munmap(dump, attr.st_size);
+#endif
+    munmap(dump, attr.st_size);
 }
 
 AV* pattern_read_lines(const char* filename, HV* needed_lines)
