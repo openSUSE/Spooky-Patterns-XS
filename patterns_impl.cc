@@ -23,6 +23,7 @@
 #include <list>
 #include <map>
 #include <perl.h>
+#include <sys/mman.h>
 
 #define DEBUG 0
 #define MAX_SKIP 99
@@ -189,7 +190,7 @@ void pattern_add(Matcher* m, unsigned int id, av* tokens)
         UV uv = SvUV(sv);
 
         if (uv <= MAX_SKIP) {
-            current = check_or_insert_skip(current->skips, uv);
+            current = check_or_insert_skip(*current->skips, uv);
         } else {
             TokenTree* next = current->find(uv);
             if (!next) {
@@ -226,7 +227,7 @@ unsigned int check_token_matches(const TokenList& tokens, unsigned int offset, c
             tokens[offset].text.c_str());
 #endif
 
-        for (SkipList::const_iterator it = patterns->skips.begin(); it != patterns->skips.end(); ++it) {
+        for (SkipList::const_iterator it = patterns->skips->begin(); it != patterns->skips->end(); ++it) {
             for (int i = 1; i <= it->first; ++i) {
                 int cpid = 0;
                 unsigned int matched = check_token_matches(tokens, offset + i, it->second, &cpid);
@@ -393,10 +394,10 @@ void pattern_dump(Matcher* m, const char* filename)
     fwrite(&t->pid, sizeof(t->pid), 1, file);
     char skip_count = 0;
     // forward_list has no length - but is cheap
-    for (SkipList::const_iterator it = t->skips.begin(); it != t->skips.end(); ++it)
+    for (SkipList::const_iterator it = t->skips->begin(); it != t->skips->end(); ++it)
       skip_count++;
     fwrite(&skip_count, 1, 1, file);
-    for (SkipList::const_iterator it = t->skips.begin(); it != t->skips.end(); ++it) {
+    for (SkipList::const_iterator it = t->skips->begin(); it != t->skips->end(); ++it) {
       fwrite(&it->first, 1, 1, file);
       int32_t index = si.trees[it->second];
       fwrite(&index, sizeof(int32_t), 1, file);
@@ -433,24 +434,42 @@ void pattern_dump(Matcher* m, const char* filename)
 
 void pattern_load(Matcher* m, const char* filename)
 {
-  FILE *file = fopen(filename, "rb");
-  fread(&m->longest_pattern, sizeof(m->longest_pattern), 1, file);
+  int fd = open(filename, O_RDONLY);
+  if (fd < 0)
+    {
+      fprintf(stderr, "Couldn't open %s\n", filename);
+      return;
+    }
+  struct stat attr;
+  if(fstat(fd, &attr) == -1) {
+    fprintf(stderr, "Error accessing %s\n", filename);
+    return;
+  }
+  char *dump = (char*)mmap(NULL, attr.st_size, PROT_READ, MAP_PRIVATE|MAP_POPULATE, fd, 0);
 
-  SerializeInfo si;
+  m->longest_pattern = *reinterpret_cast<SSize_t*>(dump);
+  dump += sizeof(SSize_t);
   
-  fread(&si.tree_count, sizeof(si.tree_count), 1, file);
-  fread(&si.node_count, sizeof(si.tree_count), 1, file);
-  fread(&si.element_count, sizeof(si.tree_count), 1, file);
+  SerializeInfo si;
 
-  uint64_t *elements = new uint64_t[si.element_count];
-  fread(elements, sizeof(uint64_t), si.element_count, file);
+  si.tree_count = *reinterpret_cast<int32_t*>(dump);
+  dump += sizeof(int32_t);
+  si.node_count = *reinterpret_cast<int32_t*>(dump);
+  dump += sizeof(int32_t);
+  si.element_count = *reinterpret_cast<int32_t*>(dump);
+  dump += sizeof(int32_t);
 
+  uint64_t *elements = reinterpret_cast<uint64_t *>(dump);
+  dump += sizeof(uint64_t) * si.element_count;
+
+#if 1
   TokenTree **trees = new TokenTree*[si.tree_count];
   for (int i = 0; i < si.tree_count; i++)
-    trees[i] = new TokenTree;
-
-  std::cout << "count " << si.element_count << " " << si.node_count  << std::endl;
- 
+    trees[i] = new TokenTree(m->pattern_tree.nullNode);
+#endif
+  
+  std::cout << "count " << si.element_count << " " << si.node_count  << " " << si.tree_count << std::endl;
+#if 0
   for (int i = 0; i < si.tree_count; i++) {
     TokenTree *t = trees[i];
     fread(&t->pid, sizeof(t->pid), 1, file);
@@ -458,14 +477,14 @@ void pattern_load(Matcher* m, const char* filename)
     char skip_count = 0;
     fread(&skip_count, 1, 1, file);
     //std::cout << "SC " << int(skip_count) << std::endl;
-    SkipList::const_iterator last = t->skips.before_begin();
+    SkipList::const_iterator last = t->skips->before_begin();
     for (int s = 0; s < skip_count; s++) {
       unsigned char skip;
       fread(&skip, 1, 1, file);
       int32_t index;
       fread(&index, sizeof(index), 1, file);
       //std::cout << "Index " << index << std::endl;
-      last = t->skips.emplace_after(last, skip, trees[index]);
+      last = t->skips->emplace_after(last, skip, trees[index]);
     }
     int32_t index;
     fread(&index, sizeof(index), 1, file);
@@ -491,12 +510,11 @@ void pattern_load(Matcher* m, const char* filename)
     TokenTree *t = trees[i];
     t->root = nodes[reinterpret_cast<long>(t->root)];
   }
-  
+
   delete [] nodes;
   delete [] trees;
-  delete [] elements;
-
-  fclose(file);
+#endif  
+  munmap(dump, attr.st_size);
 }
 
 AV* pattern_read_lines(const char* filename, HV* needed_lines)

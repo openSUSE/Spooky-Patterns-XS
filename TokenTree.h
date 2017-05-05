@@ -66,7 +66,9 @@ struct SerializeInfo {
 
 class TokenTree {
 public:
+    TokenTree(AANode *null);
     TokenTree();
+    
     ~TokenTree();
 
     TokenTree* find(uint64_t x) const;
@@ -80,10 +82,9 @@ public:
     const TokenTree& operator=(const TokenTree& rhs);
 
     int pid;
-    SkipList skips;
+    SkipList *skips;
     AANode* root;
   
-private:
     AANode* nullNode;
 
     // Recursive routines
@@ -110,6 +111,13 @@ TokenTree::TokenTree()
     nullNode->level = 0;
     root = nullNode;
     pid = 0;
+    skips = 0;
+}
+
+TokenTree::TokenTree(AANode *null) {
+  root = nullNode = null;
+  pid = 0;
+  skips = 0;
 }
 
 /* 
@@ -118,7 +126,7 @@ TokenTree::TokenTree()
 TokenTree::~TokenTree()
 {
     makeEmpty();
-    delete nullNode;
+    //delete nullNode;
 }
 
 /*
@@ -231,9 +239,11 @@ void TokenTree::printTree(AANode* t, const std::string& indent) const
 
 void TokenTree::mark_elements(SerializeInfo &si) const
 {
-  for (SkipList::const_iterator it = skips.begin(); it != skips.end(); ++it)
+  if (skips) {
+    for (SkipList::const_iterator it = skips->begin(); it != skips->end(); ++it)
       it->second->mark_elements(si);
- 
+  }
+  
   if (si.trees.find(this) == si.trees.end())
       si.trees[this] = si.tree_count++;
     
