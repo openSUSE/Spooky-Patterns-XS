@@ -449,10 +449,6 @@ void pattern_load(Matcher* m, const char* filename)
   for (int i = 0; i < si.tree_count; i++)
     trees[i] = new TokenTree;
 
-  AANode **nodes = new AANode*[si.node_count];
-  for (int i = 0; i < si.node_count; i++)
-    nodes[i] = new AANode;
-  
   std::cout << "count " << si.element_count << " " << si.node_count  << std::endl;
  
   for (int i = 0; i < si.tree_count; i++) {
@@ -474,20 +470,26 @@ void pattern_load(Matcher* m, const char* filename)
     int32_t index;
     fread(&index, sizeof(index), 1, file);
     //std::cout << "Index2 " << index << std::endl;
-    t->root = nodes[index];
+    t->root = reinterpret_cast<AANode*>(index);
   }
 
+  AANode **nodes = new AANode*[si.node_count];
+  
   // trees reference nodes and are recursive
   for (int i = 0; i < si.node_count; i++) {
-    AANode *n = nodes[i];
-    int32_t index;
-    fread(&index, sizeof(index), 1, file);
-    n->left = nodes[index];
-    fread(&index, sizeof(index), 1, file);
-    n->right = nodes[index];
-    fread(&n->level, sizeof(n->level), 1, file);
-    fread(&index, sizeof(index), 1, file);
-    n->next_token = trees[index];
+    int32_t e, left, right, nt;
+    uint16_t level;
+    e = 0;
+    fread(&left, sizeof(left), 1, file);
+    fread(&right, sizeof(right), 1, file);
+    fread(&level, sizeof(level), 1, file);
+    fread(&nt, sizeof(nt), 1, file);
+    nodes[i] = new AANode(elements[e], trees[nt], nodes[left], nodes[right], level);
+  }
+
+  for (int i = 0; i < si.tree_count; i++) {
+    TokenTree *t = trees[i];
+    t->root = nodes[reinterpret_cast<long>(t->root)];
   }
   
   delete [] nodes;
