@@ -27,6 +27,8 @@ class SpookyHash;
 Matcher* pattern_init_matcher();
 void pattern_add(Matcher* m, unsigned id, AV* tokens);
 AV* pattern_find_matches(Matcher* m, const char* filename);
+void pattern_dump(Matcher* m, const char* filename);
+void pattern_load(Matcher* m, const char* filename);
 void destroy_matcher(Matcher* m);
 AV* pattern_read_lines(const char* filename, HV* needed);
 SpookyHash* pattern_init_hash(UV seed1, UV seed2);

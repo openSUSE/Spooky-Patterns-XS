@@ -359,6 +359,144 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
     return ret;
 }
 
+void pattern_dump(Matcher* m, const char* filename)
+{
+  FILE *file = fopen(filename, "wb");
+  fwrite(&m->longest_pattern, sizeof(m->longest_pattern), 1, file);
+
+  SerializeInfo si;
+  
+  m->pattern_tree.mark_elements(si);
+  fwrite(&si.tree_count, sizeof(si.tree_count), 1, file);
+  fwrite(&si.node_count, sizeof(si.tree_count), 1, file);
+  fwrite(&si.element_count, sizeof(si.tree_count), 1, file);
+
+  // elements are quick
+  uint64_t *elements = new uint64_t[si.element_count];
+  for (std::map<uint64_t, int>::const_iterator it = si.elements.begin(); it != si.elements.end(); it++) {
+    elements[it->second] = it->first;
+  }
+  fwrite(elements, sizeof(uint64_t), si.element_count, file);
+  delete [] elements;
+
+  // trees reference nodes and are recursive
+  const TokenTree **trees = new const TokenTree*[si.tree_count];
+  memset(trees, 0, si.tree_count * sizeof(TokenTree*));
+  for (std::map<const TokenTree *, int>::const_iterator it = si.trees.begin();
+       it != si.trees.end(); it++)
+    {
+      trees[it->second] = it->first;
+    }
+  
+  for (int i = 0; i < si.tree_count; i++) {
+    const TokenTree *t = trees[i];
+    fwrite(&t->pid, sizeof(t->pid), 1, file);
+    char skip_count = 0;
+    // forward_list has no length - but is cheap
+    for (SkipList::const_iterator it = t->skips.begin(); it != t->skips.end(); ++it)
+      skip_count++;
+    fwrite(&skip_count, 1, 1, file);
+    for (SkipList::const_iterator it = t->skips.begin(); it != t->skips.end(); ++it) {
+      fwrite(&it->first, 1, 1, file);
+      int32_t index = si.trees[it->second];
+      fwrite(&index, sizeof(int32_t), 1, file);
+    }
+    int32_t index = si.nodes[t->root];
+    fwrite(&index, sizeof(int32_t), 1, file);
+  }
+  delete [] trees;
+
+  // trees reference nodes and are recursive
+  const AANode **nodes = new const AANode*[si.node_count];
+  memset(nodes, 0, si.node_count * sizeof(AANode*));
+  for (std::map<const AANode *, int>::const_iterator it = si.nodes.begin();
+       it != si.nodes.end(); it++)
+    {
+      nodes[it->second] = it->first;
+    }
+  for (int i = 0; i < si.node_count; i++) {
+    const AANode *n = nodes[i];
+    int32_t index = si.nodes[n->left];
+    fwrite(&index, sizeof(int32_t), 1, file);
+    index = si.nodes[n->right];
+    fwrite(&index, sizeof(int32_t), 1, file);
+    fwrite(&n->level, sizeof(n->level), 1, file);
+    index = si.trees[n->next_token];
+    fwrite(&index, sizeof(int32_t), 1, file);
+  }
+  
+  delete [] nodes;
+  
+  std::cout << "count " << si.element_count << " " << si.node_count  << std::endl;
+  fclose(file);
+}
+
+void pattern_load(Matcher* m, const char* filename)
+{
+  FILE *file = fopen(filename, "rb");
+  fread(&m->longest_pattern, sizeof(m->longest_pattern), 1, file);
+
+  SerializeInfo si;
+  
+  fread(&si.tree_count, sizeof(si.tree_count), 1, file);
+  fread(&si.node_count, sizeof(si.tree_count), 1, file);
+  fread(&si.element_count, sizeof(si.tree_count), 1, file);
+
+  uint64_t *elements = new uint64_t[si.element_count];
+  fread(elements, sizeof(uint64_t), si.element_count, file);
+
+  TokenTree **trees = new TokenTree*[si.tree_count];
+  for (int i = 0; i < si.tree_count; i++)
+    trees[i] = new TokenTree;
+
+  AANode **nodes = new AANode*[si.node_count];
+  for (int i = 0; i < si.node_count; i++)
+    nodes[i] = new AANode;
+  
+  std::cout << "count " << si.element_count << " " << si.node_count  << std::endl;
+ 
+  for (int i = 0; i < si.tree_count; i++) {
+    TokenTree *t = trees[i];
+    fread(&t->pid, sizeof(t->pid), 1, file);
+    //std::cout << "PID " << t->pid << std::endl;
+    char skip_count = 0;
+    fread(&skip_count, 1, 1, file);
+    //std::cout << "SC " << int(skip_count) << std::endl;
+    SkipList::const_iterator last = t->skips.before_begin();
+    for (int s = 0; s < skip_count; s++) {
+      unsigned char skip;
+      fread(&skip, 1, 1, file);
+      int32_t index;
+      fread(&index, sizeof(index), 1, file);
+      //std::cout << "Index " << index << std::endl;
+      last = t->skips.emplace_after(last, skip, trees[index]);
+    }
+    int32_t index;
+    fread(&index, sizeof(index), 1, file);
+    //std::cout << "Index2 " << index << std::endl;
+    t->root = nodes[index];
+  }
+
+  // trees reference nodes and are recursive
+  for (int i = 0; i < si.node_count; i++) {
+    AANode *n = nodes[i];
+    int32_t index;
+    fread(&index, sizeof(index), 1, file);
+    n->left = nodes[index];
+    fread(&index, sizeof(index), 1, file);
+    n->right = nodes[index];
+    fread(&n->level, sizeof(n->level), 1, file);
+    fread(&index, sizeof(index), 1, file);
+    n->next_token = trees[index];
+  }
+  
+  delete [] nodes;
+  delete [] trees;
+  delete [] elements;
+
+  fclose(file);
+}
+
 AV* pattern_read_lines(const char* filename, HV* needed_lines)
 {
     AV* ret = newAV();

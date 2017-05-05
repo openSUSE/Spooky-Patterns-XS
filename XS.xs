@@ -68,6 +68,14 @@ AV *find_matches(Spooky::Patterns::XS::Matcher self, const char *filename)
  OUTPUT:
    RETVAL
 
+void dump(Spooky::Patterns::XS::Matcher self, const char *filename)
+ CODE:
+   pattern_dump(self, filename);
+
+void load(Spooky::Patterns::XS::Matcher self, const char *filename)
+ CODE:
+   pattern_load(self, filename);
+
 void DESTROY(Spooky::Patterns::XS::Matcher self)
  CODE:
   destroy_matcher(self);

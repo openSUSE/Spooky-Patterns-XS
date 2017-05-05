@@ -6,6 +6,7 @@
 #include <forward_list>
 #include <iostream> // For NULL
 #include <string>
+#include <map>
 
 // TokenTree class
 //
@@ -22,12 +23,12 @@
 // not understand nested classes.
 class TokenTree;
 
-class AANode {
+struct AANode {
     uint64_t element;
     TokenTree* next_token;
     AANode* left;
     AANode* right;
-    int level;
+    uint16_t level;
 
     AANode()
         : next_token(NULL)
@@ -50,6 +51,19 @@ class AANode {
 
 typedef std::forward_list<std::pair<unsigned char, TokenTree*> > SkipList;
 
+struct SerializeInfo {
+  std::map<const AANode*, int> nodes;
+  int32_t node_count;
+  std::map<const TokenTree*, int> trees;
+  int32_t tree_count;
+  std::map<uint64_t, int> elements;
+  int32_t element_count;
+
+  SerializeInfo() {
+    tree_count = node_count = element_count = 0;
+  }
+};
+
 class TokenTree {
 public:
     TokenTree();
@@ -58,7 +72,8 @@ public:
     TokenTree* find(uint64_t x) const;
     bool isEmpty() const;
     void printTree() const;
-
+    void mark_elements(SerializeInfo &si) const;
+ 
     void makeEmpty();
     void insert(uint64_t x, TokenTree* next_token);
 
@@ -66,16 +81,17 @@ public:
 
     int pid;
     SkipList skips;
-
-private:
     AANode* root;
+  
+private:
     AANode* nullNode;
 
     // Recursive routines
     void insert(uint64_t x, TokenTree* next_token, AANode*& t);
     void makeEmpty(AANode*& t);
     void printTree(AANode* t, const std::string&) const;
-
+    void mark_elements(AANode *t, SerializeInfo &si) const;
+  
     // Rotations
     void skew(AANode*& t) const;
     void split(AANode*& t) const;
@@ -203,14 +219,39 @@ void TokenTree::makeEmpty(AANode*& t)
  */
 void TokenTree::printTree(AANode* t, const std::string& indent) const
 {
-    if (t != nullNode) {
-        std::string ni = indent + "  ";
-        printTree(t->left, ni);
-        std::cout << indent << t->element << " TREE BEGIN" << std::endl;
-        t->next_token->printTree();
-        std::cout << indent << "TREE END\n";
-        printTree(t->right, ni);
-    }
+  if (t == nullNode)
+    return;
+  std::string ni = indent + "  ";
+  printTree(t->left, ni);
+  std::cout << indent << t->element << " TREE BEGIN" << std::endl;
+  t->next_token->printTree();
+  std::cout << indent << "TREE END\n";
+  printTree(t->right, ni);
+}
+
+void TokenTree::mark_elements(SerializeInfo &si) const
+{
+  for (SkipList::const_iterator it = skips.begin(); it != skips.end(); ++it)
+      it->second->mark_elements(si);
+ 
+  if (si.trees.find(this) == si.trees.end())
+      si.trees[this] = si.tree_count++;
+    
+  mark_elements(root, si);
+}
+
+void TokenTree::mark_elements(AANode *t, SerializeInfo &si) const
+{
+  if (t == nullNode)
+    return;
+  mark_elements(t->left, si);
+  mark_elements(t->right, si);
+  if (si.elements.find(t->element) == si.elements.end())
+    si.elements[t->element] = si.element_count++;
+  // unlikely
+  if (si.nodes.find(t) == si.nodes.end())
+    si.nodes[t] = si.node_count++;
+  t->next_token->mark_elements(si);
 }
 
 /**
