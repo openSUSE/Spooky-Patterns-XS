@@ -36,6 +36,8 @@ struct Token {
 
 typedef std::vector<Token> TokenList;
 
+AANode* TokenTree::nullNode = 0;
+
 const int MAX_TOKEN_LENGTH = 100;
 const int MAX_LINE_SIZE = 8000;
 
@@ -470,7 +472,7 @@ void pattern_load(Matcher* m, const char* filename)
 #if 1
     TokenTree** trees = new TokenTree*[si.tree_count];
     for (int i = 0; i < si.tree_count; i++)
-        trees[i] = new TokenTree(m->pattern_tree.nullNode);
+        trees[i] = new TokenTree;
 #endif
 
     std::cout << "count " << si.element_count << " " << si.node_count << " " << si.tree_count << std::endl;
