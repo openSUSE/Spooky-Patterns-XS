@@ -15,29 +15,22 @@
 // ******************PUBLIC OPERATIONS*********************
 // void insert( x )       --> Insert x
 // uint64_t find( x )   --> Return item that matches x
-// boolean isEmpty( )     --> Return true if empty; else false
-// void makeEmpty( )      --> Remove all items
-// void printTree( )      --> Print tree in sorted order
 
 // Node and forward declaration because g++ does
 // not understand nested classes.
 class TokenTree;
 
+class AANode;
+
 struct AANode {
+
     uint64_t element;
     TokenTree* next_token;
-    AANode* left;
-    AANode* right;
+    int left;
+    int right;
     uint16_t level;
 
-    AANode()
-        : next_token(NULL)
-        , left(NULL)
-        , right(NULL)
-        , level(1)
-    {
-    }
-    AANode(const uint64_t& e, TokenTree* nt, AANode* lt, AANode* rt, int lv = 1)
+    AANode(const uint64_t& e, TokenTree* nt, int lt, int rt, int lv = 1)
         : element(e)
         , next_token(nt)
         , left(lt)
@@ -47,6 +40,11 @@ struct AANode {
     }
 
     friend class TokenTree;
+
+private:
+    AANode()
+    {
+    }
 };
 
 typedef std::forward_list<std::pair<unsigned char, TokenTree*> > SkipList;
@@ -71,40 +69,34 @@ public:
     ~TokenTree();
 
     TokenTree* find(uint64_t x) const;
-    bool isEmpty() const;
-    void printTree() const;
     void mark_elements(SerializeInfo& si) const;
 
-    void makeEmpty();
     void insert(uint64_t x, TokenTree* next_token);
 
     const TokenTree& operator=(const TokenTree& rhs);
+    void printTree() const;
 
     int pid;
     SkipList* skips;
-    AANode* root;
+    int root;
 
-    static AANode* nullNode;
+    static std::vector<AANode> nodes;
 
     void initNull()
     {
-        if (!nullNode) {
-            nullNode = new AANode;
-            nullNode->left = nullNode->right = nullNode;
-            nullNode->level = 0;
-        }
-        root = nullNode;
+        if (nodes.empty())
+            nodes.emplace_back(0, (TokenTree*)0, 0, 0, 0);
+        root = 0;
     }
 
     // Recursive routines
-    void insert(uint64_t x, TokenTree* next_token, AANode*& t);
-    void makeEmpty(AANode*& t);
-    void printTree(AANode* t, const std::string&) const;
-    void mark_elements(AANode* t, SerializeInfo& si) const;
+    int insert(uint64_t x, TokenTree* next_token, int t);
+    void printTree(int t, const std::string&) const;
+    void mark_elements(int t, SerializeInfo& si) const;
 
     // Rotations
-    void skew(AANode*& t) const;
-    void split(AANode*& t) const;
+    int skew(int t);
+    int split(int t);
 
     // forbidden
     TokenTree(const TokenTree& rhs);
@@ -125,8 +117,7 @@ TokenTree::TokenTree()
  */
 TokenTree::~TokenTree()
 {
-    makeEmpty();
-    //delete nullNode;
+    // TODO
 }
 
 /*
@@ -134,7 +125,25 @@ TokenTree::~TokenTree()
  */
 void TokenTree::insert(uint64_t x, TokenTree* next_token)
 {
-    insert(x, next_token, root);
+    root = insert(x, next_token, root);
+}
+
+void TokenTree::printTree() const
+{
+    if (root == 0)
+        std::cerr << "Empty tree" << std::endl;
+    else
+        printTree(root, "");
+}
+
+void TokenTree::printTree(int t, const std::string& indent) const
+{
+    if (t == 0)
+        return;
+    std::string ni = indent + "  ";
+    printTree(nodes[t].left, ni);
+    fprintf(stderr, "%s(%d-%d-%d) %lu\n", indent.c_str(), nodes[t].left, t, nodes[t].right, nodes[t].element);
+    printTree(nodes[t].right, ni);
 }
 
 /**
@@ -143,47 +152,17 @@ void TokenTree::insert(uint64_t x, TokenTree* next_token)
  */
 TokenTree* TokenTree::find(uint64_t x) const
 {
-    AANode* current = root;
-    nullNode->element = x;
+    int current = root;
+    nodes[0].element = x;
 
     for (;;) {
-        if (x < current->element)
-            current = current->left;
-        else if (current->element < x)
-            current = current->right;
-        else if (current != nullNode)
-            return current->next_token;
-        else
-            return NULL;
+        if (x < nodes[current].element) {
+            current = nodes[current].left;
+        } else if (nodes[current].element < x) {
+            current = nodes[current].right;
+        } else
+            return nodes[current].next_token;
     }
-}
-
-/**
- * Make the tree logically empty.
- */
-void TokenTree::makeEmpty()
-{
-    makeEmpty(root);
-}
-
-/**
- * Test if the tree is logically empty.
- * Return true if empty, false otherwise.
- */
-bool TokenTree::isEmpty() const
-{
-    return root == nullNode;
-}
-
-/**
- * Print the tree contents in sorted order.
- */
-void TokenTree::printTree() const
-{
-    if (root == nullNode)
-        std::cout << "Empty tree" << std::endl;
-    else
-        printTree(root, "");
 }
 
 /**
@@ -192,49 +171,24 @@ void TokenTree::printTree() const
  * t is the node that roots the tree.
  * Set the new root.
  */
-void TokenTree::insert(uint64_t x, TokenTree* next_token, AANode*& t)
+int TokenTree::insert(uint64_t x, TokenTree* next_token, int t)
 {
-    if (t == nullNode)
-        t = new AANode(x, next_token, nullNode, nullNode);
-    else if (x < t->element)
-        insert(x, next_token, t->left);
-    else if (t->element < x)
-        insert(x, next_token, t->right);
-    else {
+    if (t == 0) {
+        nodes.emplace_back(x, next_token, 0, 0);
+        t = nodes.size() - 1;
+    } else if (x < nodes[t].element) {
+        int t2 = insert(x, next_token, nodes[t].left);
+        nodes[t].left = t2;
+    } else if (nodes[t].element < x) {
+        int t2 = insert(x, next_token, nodes[t].right);
+        nodes[t].right = t2;
+    } else {
         std::cerr << "Duplicate " << x << " ignored on insert\n";
-        return; // Duplicate; do nothing
+        return t; // Duplicate; do nothing
     }
-    skew(t);
-    split(t);
-}
-
-/**
- * Internal method to make subtree empty.
- */
-void TokenTree::makeEmpty(AANode*& t)
-{
-    if (t != nullNode) {
-        makeEmpty(t->left);
-        makeEmpty(t->right);
-        delete t;
-    }
-    t = nullNode;
-}
-
-/**
- * Internal method to print a subtree in sorted order.
- * @param t the node that roots the tree.
- */
-void TokenTree::printTree(AANode* t, const std::string& indent) const
-{
-    if (t == nullNode)
-        return;
-    std::string ni = indent + "  ";
-    printTree(t->left, ni);
-    std::cout << indent << t->element << " TREE BEGIN" << std::endl;
-    t->next_token->printTree();
-    std::cout << indent << "TREE END\n";
-    printTree(t->right, ni);
+    t = skew(t);
+    t = split(t);
+    return t;
 }
 
 void TokenTree::mark_elements(SerializeInfo& si) const
@@ -247,50 +201,57 @@ void TokenTree::mark_elements(SerializeInfo& si) const
     if (si.trees.find(this) == si.trees.end())
         si.trees[this] = si.tree_count++;
 
-    mark_elements(root, si);
+    //mark_elements(root, si);
 }
 
-void TokenTree::mark_elements(AANode* t, SerializeInfo& si) const
+void TokenTree::mark_elements(int t, SerializeInfo& si) const
 {
-    if (t == nullNode)
+    if (t == 0)
         return;
-    mark_elements(t->left, si);
-    mark_elements(t->right, si);
-    if (si.elements.find(t->element) == si.elements.end())
-        si.elements[t->element] = si.element_count++;
+    //mark_elements(t->left, si);
+    //mark_elements(t->right, si);
+    //if (si.elements.find(t->element) == si.elements.end())
+    //    si.elements[t->element] = si.element_count++;
     // unlikely
-    if (si.nodes.find(t) == si.nodes.end())
-        si.nodes[t] = si.node_count++;
-    t->next_token->mark_elements(si);
+    //if (si.nodes.find(t) == si.nodes.end())
+    //    si.nodes[t] = si.node_count++;
+    //t->next_token->mark_elements(si);
 }
 
 /**
  * Skew primitive for AA-trees.
  * t is the node that roots the tree.
  */
-void TokenTree::skew(AANode*& t) const
+int TokenTree::skew(int t)
 {
-    if (t->left->level == t->level) {
-        AANode* s = t->left;
-        t->left = s->right;
-        s->right = t;
-        t = s;
+    AANode& tn = nodes[t];
+    AANode& ln = nodes[tn.left];
+    if (ln.level == tn.level) {
+        int s = tn.left;
+        tn.left = ln.right;
+        ln.right = t;
+        return s;
     }
+    return t;
 }
 
 /**
  * Split primitive for AA-trees.
  * t is the node that roots the tree.
  */
-void TokenTree::split(AANode*& t) const
+int TokenTree::split(int t)
 {
-    if (t->right->right->level == t->level) {
-        AANode* s = t->right;
-        t->right = s->left;
-        s->left = t;
-        t = s;
-        t->level++;
+    AANode& tn = nodes[t];
+    AANode& rn = nodes[tn.right];
+    AANode& rrn = nodes[rn.right];
+    if (rrn.level == tn.level) {
+        int s = tn.right;
+        tn.right = rn.left;
+        rn.left = t;
+        rn.level++;
+        return s;
     }
+    return t;
 }
 
 #endif

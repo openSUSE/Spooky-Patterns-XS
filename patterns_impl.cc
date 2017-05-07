@@ -28,6 +28,8 @@
 #define DEBUG 0
 #define MAX_SKIP 99
 
+using namespace std;
+
 struct Token {
     int linenumber;
     uint64_t hash;
@@ -36,7 +38,7 @@ struct Token {
 
 typedef std::vector<Token> TokenList;
 
-AANode* TokenTree::nullNode = 0;
+std::vector<AANode> TokenTree::nodes;
 
 const int MAX_TOKEN_LENGTH = 100;
 const int MAX_LINE_SIZE = 8000;
@@ -70,7 +72,6 @@ struct Matcher {
             ignore_tree.insert(h, &dummy_next);
             index++;
         }
-
         longest_pattern = 0;
     }
 };
@@ -411,8 +412,8 @@ void pattern_dump(Matcher* m, const char* filename)
             int32_t index = si.trees[it->second];
             fwrite(&index, sizeof(int32_t), 1, file);
         }
-        int32_t index = si.nodes[t->root];
-        fwrite(&index, sizeof(int32_t), 1, file);
+        //int32_t index = si.nodes[t->root];
+        //fwrite(&index, sizeof(int32_t), 1, file);
     }
     delete[] trees;
 
@@ -424,14 +425,14 @@ void pattern_dump(Matcher* m, const char* filename)
         nodes[it->second] = it->first;
     }
     for (int i = 0; i < si.node_count; i++) {
-        const AANode* n = nodes[i];
-        int32_t index = si.nodes[n->left];
-        fwrite(&index, sizeof(int32_t), 1, file);
-        index = si.nodes[n->right];
-        fwrite(&index, sizeof(int32_t), 1, file);
-        fwrite(&n->level, sizeof(n->level), 1, file);
-        index = si.trees[n->next_token];
-        fwrite(&index, sizeof(int32_t), 1, file);
+        //const AANode* n = nodes[i];
+        //int32_t index = si.nodes[n->left];
+        //fwrite(&index, sizeof(int32_t), 1, file);
+        //index = si.nodes[n->right];
+        //fwrite(&index, sizeof(int32_t), 1, file);
+        //fwrite(&n->level, sizeof(n->level), 1, file);
+        //index = si.trees[n->next_token];
+        //fwrite(&index, sizeof(int32_t), 1, file);
     }
 
     delete[] nodes;
@@ -466,8 +467,8 @@ void pattern_load(Matcher* m, const char* filename)
     si.element_count = *reinterpret_cast<int32_t*>(dump);
     dump += sizeof(int32_t);
 
-    uint64_t* elements = reinterpret_cast<uint64_t*>(dump);
-    dump += sizeof(uint64_t) * si.element_count;
+//uint64_t* elements = reinterpret_cast<uint64_t*>(dump);
+//dump += sizeof(uint64_t) * si.element_count;
 
 #if 1
     TokenTree** trees = new TokenTree*[si.tree_count];
