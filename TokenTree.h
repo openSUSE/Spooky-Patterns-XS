@@ -156,12 +156,13 @@ TokenTree* TokenTree::find(uint64_t x) const
     nodes[0].element = x;
 
     for (;;) {
-        if (x < nodes[current].element) {
-            current = nodes[current].left;
-        } else if (nodes[current].element < x) {
-            current = nodes[current].right;
+        const AANode& cn = nodes[current];
+        if (x < cn.element) {
+            current = cn.left;
+        } else if (cn.element < x) {
+            current = cn.right;
         } else
-            return nodes[current].next_token;
+            return cn.next_token;
     }
 }
 
