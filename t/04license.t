@@ -1,4 +1,3 @@
-
 #! /usr/bin/perl
 
 use 5.012;
@@ -32,6 +31,22 @@ my %exp = (
     9  => [ [ 20, 1,   29 ] ],
     10 => [ [ 22, 113, 114 ], [ 4,  112, 112 ], [ 3, 109, 109 ] ]
 );
+
+for my $fn ( glob("t/04license.*.txt") ) {
+    $fn =~ m/\.(.*)\.txt/;
+    my $num = $1;
+
+    my $best = $m->find_matches($fn);
+
+    #use Data::Dumper;
+    #print STDERR Dumper($best);
+    cmp_deeply( $best, $exp{$num}, "Structure for $num fits" );
+}
+
+$m->dump('t/04dump');
+
+$m = Spooky::Patterns::XS::init_matcher();
+$m->load('t/04dump');
 
 for my $fn ( glob("t/04license.*.txt") ) {
     $fn =~ m/\.(.*)\.txt/;
