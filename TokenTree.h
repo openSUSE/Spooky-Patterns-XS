@@ -26,8 +26,8 @@ struct AANode {
 
     uint64_t element;
     TokenTree* next_token;
-    int left;
-    int right;
+    uint32_t left;
+    uint32_t right;
     uint16_t level;
 
     AANode(const uint64_t& e, TokenTree* nt, int lt, int rt, int lv = 1)
@@ -50,8 +50,6 @@ private:
 typedef std::forward_list<std::pair<unsigned char, TokenTree*> > SkipList;
 
 struct SerializeInfo {
-    std::map<const AANode*, int> nodes;
-    int32_t node_count;
     std::map<const TokenTree*, int> trees;
     int32_t tree_count;
     std::map<uint64_t, int> elements;
@@ -59,7 +57,7 @@ struct SerializeInfo {
 
     SerializeInfo()
     {
-        tree_count = node_count = element_count = 0;
+        tree_count = element_count = 0;
     }
 };
 
@@ -76,9 +74,9 @@ public:
     const TokenTree& operator=(const TokenTree& rhs);
     void printTree() const;
 
-    int pid;
+    uint32_t pid;
     SkipList* skips;
-    int root;
+    uint32_t root;
 
     static std::vector<AANode> nodes;
 
@@ -117,7 +115,7 @@ TokenTree::TokenTree()
  */
 TokenTree::~TokenTree()
 {
-    // TODO
+    delete skips;
 }
 
 /*
@@ -202,21 +200,19 @@ void TokenTree::mark_elements(SerializeInfo& si) const
     if (si.trees.find(this) == si.trees.end())
         si.trees[this] = si.tree_count++;
 
-    //mark_elements(root, si);
+    mark_elements(root, si);
 }
 
 void TokenTree::mark_elements(int t, SerializeInfo& si) const
 {
     if (t == 0)
         return;
-    //mark_elements(t->left, si);
-    //mark_elements(t->right, si);
-    //if (si.elements.find(t->element) == si.elements.end())
-    //    si.elements[t->element] = si.element_count++;
+    mark_elements(nodes[t].left, si);
+    mark_elements(nodes[t].right, si);
+    if (si.elements.find(nodes[t].element) == si.elements.end())
+        si.elements[nodes[t].element] = si.element_count++;
     // unlikely
-    //if (si.nodes.find(t) == si.nodes.end())
-    //    si.nodes[t] = si.node_count++;
-    //t->next_token->mark_elements(si);
+    nodes[t].next_token->mark_elements(si);
 }
 
 /**
