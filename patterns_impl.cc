@@ -106,7 +106,7 @@ Matcher* pattern_init_matcher()
 
 void destroy_matcher(Matcher* m)
 {
-  // do nothing, we reuse the self
+    // do nothing, we reuse the self
 }
 
 static void add_token(Matcher* m, TokenList& result, const char* start, size_t len, int line)
@@ -675,7 +675,12 @@ int pattern_distance(AV* a1, AV* a2)
 
 AV* pattern_normalize(const char* p)
 {
-    Matcher m;
+    AV* ret = newAV();
+    Matcher* m = Matcher::self();
+    if (!m) {
+        fprintf(stderr, "Need a Matcher - call init_matcher\n");
+        return ret;
+    }
     TokenList t;
     int line = 1;
     while (true) {
@@ -685,14 +690,13 @@ AV* pattern_normalize(const char* p)
             copy = strndup(p, nl - p);
         else
             copy = strdup(p);
-        tokenize(&m, t, copy, line++);
+        tokenize(m, t, copy, line++);
         free(copy);
         if (!nl)
             break;
         p = nl + 1;
     }
 
-    AV* ret = newAV();
     for (TokenList::const_iterator it = t.begin(); it != t.end(); ++it) {
         AV* row = newAV();
         av_push(row, newSVuv(it->linenumber));
