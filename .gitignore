@@ -9,3 +9,4 @@ SpookyV2.o
 patterns_impl.o
 MYMETA.json
 MYMETA.yml
+t/04dump

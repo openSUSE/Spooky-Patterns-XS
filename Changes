@@ -1,5 +1,9 @@
 Revision history for Perl extension Spooky::Patterns::XS
 
+1.50    2017-05-08
+        - Support dump and load and rework data structure
+          to make it fast
+
 1.40    2017-04-21
         - Do not set UTF-8 flag in readlines
         - add normalize and distance
