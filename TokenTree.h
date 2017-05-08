@@ -22,15 +22,17 @@ class TokenTree;
 
 class AANode;
 
+typedef uint32_t TokenTreeIndex;
+
 struct AANode {
 
     uint64_t element;
-    TokenTree* next_token;
+    TokenTreeIndex next_token;
     uint32_t left;
     uint32_t right;
     uint16_t level;
 
-    AANode(const uint64_t& e, TokenTree* nt, int lt, int rt, int lv = 1)
+    AANode(const uint64_t& e, TokenTreeIndex nt, int lt, int rt, int lv = 1)
         : element(e)
         , next_token(nt)
         , left(lt)
@@ -42,53 +44,58 @@ struct AANode {
     friend class TokenTree;
 
 private:
-    AANode()
-    {
-    }
+    const AANode& operator=(const AANode& rhs);
+    AANode();
 };
 
-typedef std::forward_list<std::pair<unsigned char, TokenTree*> > SkipList;
+typedef std::forward_list<std::pair<unsigned char, TokenTreeIndex> > SkipList;
 
 struct SerializeInfo {
-    std::map<const TokenTree*, int> trees;
-    int32_t tree_count;
     std::map<uint64_t, int> elements;
     int32_t element_count;
 
     SerializeInfo()
     {
-        tree_count = element_count = 0;
+        element_count = 0;
     }
 };
 
 class TokenTree {
 public:
     TokenTree();
+    TokenTree(uint32_t _pid, uint32_t _root)
+        : pid(_pid)
+        , root(_root)
+        , skips(0)
+    {
+    }
+
     ~TokenTree();
 
-    TokenTree* find(uint64_t x) const;
+    TokenTreeIndex find(uint64_t x) const;
     void mark_elements(SerializeInfo& si) const;
 
-    void insert(uint64_t x, TokenTree* next_token);
+    void insert(uint64_t x, TokenTreeIndex next_token);
 
-    const TokenTree& operator=(const TokenTree& rhs);
     void printTree() const;
 
     uint32_t pid;
-    SkipList* skips;
     uint32_t root;
 
+    SkipList* skips;
+
     static std::vector<AANode> nodes;
+    static std::vector<TokenTree> trees;
 
     void initNull()
     {
         if (nodes.empty())
-            nodes.emplace_back(0, (TokenTree*)0, 0, 0, 0);
+            nodes.emplace_back(0, 0, 0, 0, 0);
         root = 0;
     }
 
     // Recursive routines
-    int insert(uint64_t x, TokenTree* next_token, int t);
+    int insert(uint64_t x, TokenTreeIndex next_token, int t);
     void printTree(int t, const std::string&) const;
     void mark_elements(int t, SerializeInfo& si) const;
 
@@ -96,9 +103,26 @@ public:
     int skew(int t);
     int split(int t);
 
+    const TokenTree& operator=(const TokenTree& rhs);
     // forbidden
-    TokenTree(const TokenTree& rhs);
+    TokenTree(const TokenTree& rhs) { *this = rhs; }
 };
+
+const TokenTree& TokenTree::operator=(const TokenTree& rhs)
+{
+    fprintf(stderr, "operator=\n");
+    pid = rhs.pid;
+    root = rhs.root;
+    if (rhs.skips) {
+        skips = new SkipList;
+        SkipList::const_iterator last = skips->before_begin();
+        for (SkipList::const_iterator it = rhs.skips->begin(); it != rhs.skips->end(); ++it)
+            last = skips->emplace_after(last, *it);
+    } else {
+        skips = 0;
+    }
+    return *this;
+}
 
 /**
  * Construct the tree.
@@ -121,7 +145,7 @@ TokenTree::~TokenTree()
 /*
  * Insert x into the tree; duplicates are ignored.
  */
-void TokenTree::insert(uint64_t x, TokenTree* next_token)
+void TokenTree::insert(uint64_t x, TokenTreeIndex next_token)
 {
     root = insert(x, next_token, root);
 }
@@ -148,7 +172,7 @@ void TokenTree::printTree(int t, const std::string& indent) const
  * Find item x in the tree.
  * Return the next token tree or NULL
  */
-TokenTree* TokenTree::find(uint64_t x) const
+TokenTreeIndex TokenTree::find(uint64_t x) const
 {
     int current = root;
     nodes[0].element = x;
@@ -170,7 +194,7 @@ TokenTree* TokenTree::find(uint64_t x) const
  * t is the node that roots the tree.
  * Set the new root.
  */
-int TokenTree::insert(uint64_t x, TokenTree* next_token, int t)
+int TokenTree::insert(uint64_t x, TokenTreeIndex next_token, int t)
 {
     if (t == 0) {
         nodes.emplace_back(x, next_token, 0, 0);
@@ -194,11 +218,8 @@ void TokenTree::mark_elements(SerializeInfo& si) const
 {
     if (skips) {
         for (SkipList::const_iterator it = skips->begin(); it != skips->end(); ++it)
-            it->second->mark_elements(si);
+            TokenTree::trees[it->second].mark_elements(si);
     }
-
-    if (si.trees.find(this) == si.trees.end())
-        si.trees[this] = si.tree_count++;
 
     mark_elements(root, si);
 }
@@ -212,7 +233,7 @@ void TokenTree::mark_elements(int t, SerializeInfo& si) const
     if (si.elements.find(nodes[t].element) == si.elements.end())
         si.elements[nodes[t].element] = si.element_count++;
     // unlikely
-    nodes[t].next_token->mark_elements(si);
+    TokenTree::trees[nodes[t].next_token].mark_elements(si);
 }
 
 /**
