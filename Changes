@@ -1,5 +1,8 @@
 Revision history for Perl extension Spooky::Patterns::XS
 
+1.51    2017-12-04
+        - Ignore skips at the end of a pattern
+
 1.50    2017-05-08
         - Support dump and load and rework data structure
           to make it fast

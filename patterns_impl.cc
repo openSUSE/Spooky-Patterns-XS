@@ -176,14 +176,21 @@ AV* pattern_parse(const char* str)
     free(copy);
     av_extend(ret, t.size());
     int index = 0;
+    uint64_t last_hash = MAX_SKIP + 1;
     for (TokenList::const_iterator it = t.begin(); it != t.end(); ++it) {
 
         // do not start with an expansion variable
         if (!index && it->hash <= MAX_SKIP)
             continue;
+        last_hash = it->hash;
         av_store(ret, index, newSVuv(it->hash));
         ++index;
     }
+    // do not end with an expansion variable either
+    if (last_hash <= MAX_SKIP)  {
+        av_pop(ret);
+    }
+
     return ret;
 }
 
