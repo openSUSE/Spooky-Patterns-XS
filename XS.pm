@@ -23,7 +23,7 @@ require Exporter;
 our @ISA       = qw(Exporter);
 our @EXPORT_OK = qw();
 
-our $VERSION = '1.51';
+our $VERSION = '1.52';
 
 require XSLoader;
 XSLoader::load( 'Spooky::Patterns::XS', $VERSION );

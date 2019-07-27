@@ -15,7 +15,7 @@ cmp_deeply(
 $m = Spooky::Patterns::XS::init_matcher();
 $m->add_pattern( 1, Spooky::Patterns::XS::parse_tokens('this is a $SKIP20') );
 use Data::Dumper;
-print Dumper($m->find_matches('t/03match.txt'));
+print Dumper( $m->find_matches('t/03match.txt') );
 cmp_deeply(
     $m->find_matches('t/03match.txt'),
     [ [ 1, 4, 4 ] ],

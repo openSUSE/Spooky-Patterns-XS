@@ -17,7 +17,7 @@ is( Spooky::Patterns::XS::distance( $p1, $p2 ), 4, "Distance is 2" );
 
 my @words1 = map { $_->[1] } @$p1;
 my @words2 = map { $_->[1] } @$p2;
-my @diff = sdiff( \@words1, \@words2 );
+my @diff    = sdiff( \@words1, \@words2 );
 my $seen_cs = 0;
 for my $row (@diff) {
     if ( $row->[0] eq 'c' ) {

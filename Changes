@@ -1,5 +1,8 @@
 Revision history for Perl extension Spooky::Patterns::XS
 
+1.52    2019-07-27
+        - Record all matches even if they overlap at the start
+
 1.51    2017-12-04
         - Ignore skips at the end of a pattern
 

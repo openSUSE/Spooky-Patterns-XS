@@ -43,6 +43,16 @@ std::vector<AANode> TokenTree::nodes;
 const int MAX_TOKEN_LENGTH = 100;
 const int MAX_LINE_SIZE = 8000;
 
+struct Match {
+    int start;
+    int matched;
+    int pattern;
+    int sline;
+    int eline;
+};
+
+typedef std::list<Match> Matches;
+
 struct Matcher {
     TokenTree ignore_tree;
     TokenTree pattern_tree;
@@ -250,17 +260,33 @@ void pattern_add(Matcher* m, unsigned int id, av* tokens)
         m->longest_pattern = len;
 }
 
-unsigned int check_token_matches(const TokenList& tokens, unsigned int offset, const TokenTree* patterns, int* pid)
+void add_match(const TokenList& ts, Matches& ms, int tokenlist_offset, int tokenlist_index, unsigned int matched, int pid) {
+  Match m;
+  m.start = tokenlist_offset + tokenlist_index;
+  m.matched = matched - tokenlist_index;
+
+  m.sline = ts[tokenlist_index].linenumber;
+  m.eline = ts[matched - 1].linenumber;
+
+  m.pattern = pid;
+#if DEBUG
+  fprintf(stderr, "L %d(%d)-%d(%d) id:%d\n", ts[tokenlist_index].linenumber,
+      tokenlist_offset + tokenlist_index, ts[matched - 1].linenumber, m.matched, m.pattern);
+#endif
+  ms.push_back(m);
+}
+
+void check_token_matches(const TokenList& tokens, Matches &ms, int tokenlist_offset, int tokenlist_index, unsigned int offset, const TokenTree* patterns)
 {
-    unsigned int last_match = 0;
+    if (offset >= tokens.size())
+        return;
+
     while (patterns) {
         if (offset >= tokens.size()) {
             // end of text, check if pattern ends too
-            if (patterns->pid && last_match < offset) {
-                *pid = patterns->pid;
-                last_match = offset;
-            }
-            return last_match;
+            if (patterns->pid)
+                add_match(tokens, ms, tokenlist_offset, tokenlist_index, offset, patterns->pid);
+            return;
         }
 
 #if DEBUG
@@ -272,36 +298,17 @@ unsigned int check_token_matches(const TokenList& tokens, unsigned int offset, c
         if (patterns->skips) {
             for (SkipList::const_iterator it = patterns->skips->begin(); it != patterns->skips->end(); ++it) {
                 for (int i = 1; i <= it->first; ++i) {
-                    int cpid = 0;
-                    unsigned int matched = check_token_matches(tokens, offset + i, it->second, &cpid);
-#if DEBUG
-                    fprintf(stderr, "MP2 %d SKIP %d:%d = %d %d\n", offset, it->first, i, matched, cpid);
-#endif
-
-                    if (last_match < matched) {
-                        last_match = matched;
-                        *pid = cpid;
-                    }
+                    check_token_matches(tokens, ms, tokenlist_offset, tokenlist_index, offset + i, it->second);
                 }
             }
         }
-        if (patterns->pid && last_match < offset) {
-            *pid = patterns->pid;
-            last_match = offset;
-        }
+        if (patterns->pid)
+            add_match(tokens, ms, tokenlist_offset, tokenlist_index, offset, patterns->pid);
         patterns = patterns->find(tokens[offset].hash);
         offset++;
     }
-    return last_match;
 }
 
-struct Match {
-    int start;
-    int matched;
-    int pattern;
-    int sline;
-    int eline;
-};
 
 // if either the start or the end of one region is within the other
 bool match_overlap(int s1, int e1, int s2, int e2)
@@ -313,30 +320,12 @@ bool match_overlap(int s1, int e1, int s2, int e2)
     return false;
 }
 
-typedef std::list<Match> Matches;
-
 void find_tokens(Matcher* m, TokenList& ts, Matches& ms, int tokenlist_offset, int tokenlist_index)
 {
     TokenTree* patterns = m->pattern_tree.find(ts[tokenlist_index].hash);
     if (!patterns)
         return;
-    int pid = 0;
-    int matched = check_token_matches(ts, tokenlist_index + 1, patterns, &pid);
-    if (pid) {
-        Match m;
-        m.start = tokenlist_offset + tokenlist_index;
-        m.matched = matched - tokenlist_index;
-
-        m.sline = ts[tokenlist_index].linenumber;
-        m.eline = ts[matched - 1].linenumber;
-
-        m.pattern = pid;
-#if DEBUG
-        fprintf(stderr, "L %d(%d)-%d(%d) id:%d\n", ts[tokenlist_index].linenumber,
-            tokenlist_offset + tokenlist_index, ts[tokenlist_index + matched - 1].linenumber, m.matched, m.pattern);
-#endif
-        ms.push_back(m);
-    }
+    check_token_matches(ts, ms, tokenlist_offset, tokenlist_index, tokenlist_index + 1, patterns);
 }
 
 AV* pattern_find_matches(Matcher* m, const char* filename)
@@ -348,6 +337,7 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
         std::cerr << "Failed to open " << filename << std::endl;
         return ret;
     }
+
     char line[MAX_LINE_SIZE];
     int linenumber = 1;
     TokenList ts;
