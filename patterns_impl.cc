@@ -571,8 +571,8 @@ AV* pattern_read_lines(const char* filename, HV* needed_lines)
         if (val) {
             // fgets makes sure we have a 0 at the end
             size_t len = strlen(line);
-            if (len) {
-                // remove one char (most likely newline)
+            // chop
+            if (len && line[len-1] == '\n') {
                 line[--len] = 0;
             }
             AV* row = newAV();

@@ -1,5 +1,9 @@
 Revision history for Perl extension Spooky::Patterns::XS
 
+1.53    2020-01-14
+        - Fix read_lines to return the last line in file correctly
+          if it doesn't end with a newline
+
 1.52    2019-07-27
         - Record all matches even if they overlap at the start
 
