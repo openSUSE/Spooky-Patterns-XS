@@ -15,7 +15,9 @@ t/04license.1.txt
 t/04license.10.pattern
 t/04license.10.txt
 t/04license.11.pattern
+t/04license.11.txt
 t/04license.12.pattern
+t/04license.12.txt
 t/04license.13.pattern
 t/04license.14.pattern
 t/04license.15.pattern
@@ -28,6 +30,13 @@ t/04license.2.txt
 t/04license.20.pattern
 t/04license.21.pattern
 t/04license.22.pattern
+t/04license.23.pattern
+t/04license.24.pattern
+t/04license.25.pattern
+t/04license.26.pattern
+t/04license.27.pattern
+t/04license.28.pattern
+t/04license.29.pattern
 t/04license.3.pattern
 t/04license.3.txt
 t/04license.4.pattern
