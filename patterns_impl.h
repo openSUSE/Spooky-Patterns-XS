@@ -22,16 +22,23 @@
 AV* pattern_parse(const char* str);
 AV* pattern_normalize(const char* str);
 int pattern_distance(AV* a1, AV* a2);
+AV* pattern_read_lines(const char* filename, HV* needed);
+
 struct Matcher;
-class SpookyHash;
 Matcher* pattern_init_matcher();
 void pattern_add(Matcher* m, unsigned id, AV* tokens);
 AV* pattern_find_matches(Matcher* m, const char* filename);
 void pattern_dump(Matcher* m, const char* filename);
 void pattern_load(Matcher* m, const char* filename);
 void destroy_matcher(Matcher* m);
-AV* pattern_read_lines(const char* filename, HV* needed);
+
+class SpookyHash;
 SpookyHash* pattern_init_hash(UV seed1, UV seed2);
 void pattern_add_to_hash(SpookyHash* s, SV* sv);
 void destroy_hash(SpookyHash* s);
 AV* pattern_hash128(SpookyHash* s);
+
+class BagOfPatterns;
+BagOfPatterns* pattern_init_bag_of_patterns(HV *patterns);
+void destroy_bag_of_patterns(BagOfPatterns *b);
+AV *pattern_bag_best_for(BagOfPatterns *b, const char *str);

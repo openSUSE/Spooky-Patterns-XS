@@ -1,3 +1,4 @@
-Spooky::Patterns::XS::Matcher     T_PTROBJ
-Spooky::Patterns::XS::Hash        T_PTROBJ
-AV*	                          T_AVREF_REFCOUNT_FIXED
+Spooky::Patterns::XS::Matcher       T_PTROBJ
+Spooky::Patterns::XS::Hash          T_PTROBJ
+Spooky::Patterns::XS::BagOfPatterns T_PTROBJ
+AV*	                            T_AVREF_REFCOUNT_FIXED

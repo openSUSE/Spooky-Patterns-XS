@@ -16,6 +16,7 @@
 #include "patterns_impl.h"
 #include "SpookyV2.h"
 #include "TokenTree.h"
+#include "Matcher.h"
 #include <EXTERN.h>
 #include <XSUB.h>
 #include <cstring>
@@ -30,88 +31,17 @@
 
 using namespace std;
 
-struct Token {
-    int linenumber;
-    uint64_t hash;
-    std::string text;
-};
-
-typedef std::vector<Token> TokenList;
-
 std::vector<AANode> TokenTree::nodes;
 
 const int MAX_TOKEN_LENGTH = 100;
 const int MAX_LINE_SIZE = 8000;
 
-struct Match {
-    int start;
-    int matched;
-    int pattern;
-    int sline;
-    int eline;
-};
-
-typedef std::list<Match> Matches;
-
-struct Matcher {
-    TokenTree ignore_tree;
-    TokenTree pattern_tree;
-
-    SSize_t longest_pattern;
-
-    static Matcher* _self;
-    static Matcher* self() { return _self; }
-
-    bool to_ignore(uint64_t t)
-    {
-        return ignore_tree.find(t);
-    }
-
-    Matcher()
-    {
-        if (_self) {
-            fprintf(stderr, "Matcher::self already initialized\n");
-        }
-        init();
-    }
-
-    void init()
-    {
-        TokenTree::nodes.clear();
-
-        ignore_tree.initNull();
-        pattern_tree.initNull();
-
-        // typical comment and markup - have to be single tokens!
-        static const char* ignored_tokens[] = {
-            "/", "//", "%", "%%", "dnl",
-            "#~", ";;", "\"\"", "--", "#:",
-            "\\", ">", "==", "::", "##", 0
-        };
-
-        static TokenTree dummy_next;
-
-        int index = 0;
-        while (ignored_tokens[index]) {
-            int len = strlen(ignored_tokens[index]);
-            uint64_t h = SpookyHash::Hash64(ignored_tokens[index], len, 1);
-            ignore_tree.insert(h, &dummy_next);
-            index++;
-        }
-        longest_pattern = 0;
-    }
-};
-
 Matcher* Matcher::_self = 0;
 
 Matcher* pattern_init_matcher()
 {
-    if (!Matcher::_self)
-        Matcher::_self = new Matcher;
-
-    Matcher::_self->init();
-
-    return Matcher::_self;
+    Matcher::self()->init();
+    return Matcher::self();
 }
 
 void destroy_matcher(Matcher* m)
@@ -119,7 +49,48 @@ void destroy_matcher(Matcher* m)
     // do nothing, we reuse the self
 }
 
-static void add_token(Matcher* m, TokenList& result, const char* start, size_t len, int line)
+Matcher::Matcher()
+{
+    if (_self) {
+        fprintf(stderr, "Matcher::self already initialized\n");
+    }
+    ignore_tree = new TokenTree;
+    pattern_tree = new TokenTree;
+    init();
+}
+
+void Matcher::init()
+{
+    TokenTree::nodes.clear();
+
+    ignore_tree->initNull();
+    pattern_tree->initNull();
+
+    // typical comment and markup - have to be single tokens!
+    static const char* ignored_tokens[] = {
+        "/", "//", "%", "%%", "dnl",
+        "#~", ";;", "\"\"", "--", "#:",
+        "\\", ">", "==", "::", "##", 0
+    };
+
+    static TokenTree dummy_next;
+
+    int index = 0;
+    while (ignored_tokens[index]) {
+        int len = strlen(ignored_tokens[index]);
+        uint64_t h = SpookyHash::Hash64(ignored_tokens[index], len, 1);
+        ignore_tree->insert(h, &dummy_next);
+        index++;
+    }
+    longest_pattern = 0;
+}
+
+bool Matcher::to_ignore(uint64_t t) const
+{
+    return ignore_tree->find(t);
+}
+
+void Matcher::add_token(TokenList& result, const char* start, size_t len, int line) const
 {
     if (!len)
         return;
@@ -142,13 +113,13 @@ static void add_token(Matcher* m, TokenList& result, const char* start, size_t l
         // *and* 0-3000 (at least) are "free"
         t.hash = SpookyHash::Hash64(start, len, 1);
         assert(t.hash > MAX_SKIP);
-        if (m->to_ignore(t.hash))
+        if (to_ignore(t.hash))
             return;
     }
     result.push_back(t);
 }
 
-void tokenize(Matcher* m, TokenList& result, char* str, int linenumber = 0)
+void Matcher::tokenize(TokenList& result, char* str, int linenumber)
 {
     static const char* ignore_seps = " \r\n\t*;,:!#{}()[]|";
     static const char* single_seps = "-.+?\"\'`=<>";
@@ -162,14 +133,14 @@ void tokenize(Matcher* m, TokenList& result, char* str, int linenumber = 0)
         *str = tolower(*str);
         bool ignored = (strchr(ignore_seps, *str) != NULL);
         if (ignored || strchr(single_seps, *str)) {
-            add_token(m, result, start, str - start, linenumber);
+            add_token(result, start, str - start, linenumber);
             //fprintf(stderr, "TO %d:'%s'\n", ignored, str);
             if (!ignored)
-                add_token(m, result, str, 1, linenumber);
+                add_token(result, str, 1, linenumber);
             start = str + 1;
         }
     }
-    add_token(m, result, start, str - start, linenumber);
+    add_token(result, start, str - start, linenumber);
 }
 
 AV* pattern_parse(const char* str)
@@ -182,7 +153,7 @@ AV* pattern_parse(const char* str)
         fprintf(stderr, "Need a Matcher - call init_matcher\n");
         return ret;
     }
-    tokenize(m, t, copy);
+    m->tokenize(t, copy);
     free(copy);
     av_extend(ret, t.size());
     int index = 0;
@@ -229,13 +200,13 @@ TokenTree* check_or_insert_skip(TokenTree* current, unsigned char uv)
 
 void pattern_add(Matcher* m, unsigned int id, av* tokens)
 {
-    SSize_t len = av_top_index(tokens) + 1;
+    ssize_t len = av_top_index(tokens) + 1;
     if (!len) {
         std::cerr << "add failed for id " << id << std::endl;
         return;
     }
 
-    TokenTree* current = &m->pattern_tree;
+    TokenTree* current = m->pattern_tree;
 
     for (SSize_t i = 0; i < len; ++i) {
         SV* sv = *av_fetch(tokens, i, 0);
@@ -322,7 +293,7 @@ bool match_overlap(int s1, int e1, int s2, int e2)
 
 void find_tokens(Matcher* m, TokenList& ts, Matches& ms, int tokenlist_offset, int tokenlist_index)
 {
-    TokenTree* patterns = m->pattern_tree.find(ts[tokenlist_index].hash);
+    TokenTree* patterns = m->pattern_tree->find(ts[tokenlist_index].hash);
     if (!patterns)
         return;
     check_token_matches(ts, ms, tokenlist_offset, tokenlist_index, tokenlist_index + 1, patterns);
@@ -344,7 +315,7 @@ AV* pattern_find_matches(Matcher* m, const char* filename)
     Matches ms;
     int token_offset = 0;
     while (fgets(line, sizeof(line) - 1, input)) {
-        tokenize(m, ts, line, linenumber++);
+        m->tokenize(ts, line, linenumber++);
         // preserve memory
         if (SSize_t(ts.size()) > m->longest_pattern * 100) {
             unsigned int erasing = ts.size() - m->longest_pattern - 1;
@@ -401,7 +372,7 @@ void pattern_dump(Matcher* m, const char* filename)
 
     SerializeInfo si;
 
-    m->pattern_tree.mark_elements(si);
+    m->pattern_tree->mark_elements(si);
     fwrite(&si.tree_count, sizeof(si.tree_count), 1, file);
     uint32_t count = TokenTree::nodes.size();
     fwrite(&count, sizeof(count), 1, file);
@@ -461,7 +432,7 @@ void pattern_dump(Matcher* m, const char* filename)
         fwrite(&index, sizeof(int32_t), 1, file);
     }
 
-    uint32_t index = m->pattern_tree.root;
+    uint32_t index = m->pattern_tree->root;
     fwrite(&index, sizeof(uint32_t), 1, file);
 
     fclose(file);
@@ -527,7 +498,7 @@ void pattern_load(Matcher* m, const char* filename)
 
     TokenTree::nodes.clear();
     TokenTree::nodes.reserve(node_count);
-    m->pattern_tree.initNull();
+    m->pattern_tree->initNull();
 
     for (unsigned int i = 1; i < node_count; i++) {
         uint64_t element = *reinterpret_cast<uint64_t*>(dump);
@@ -545,7 +516,7 @@ void pattern_load(Matcher* m, const char* filename)
 
     //delete [] trees;
 
-    m->pattern_tree.root = *reinterpret_cast<uint32_t*>(dump);
+    m->pattern_tree->root = *reinterpret_cast<uint32_t*>(dump);
     dump += sizeof(uint32_t);
 
     munmap(dump, attr.st_size);
@@ -674,10 +645,6 @@ AV* pattern_normalize(const char* p)
 {
     AV* ret = newAV();
     Matcher* m = Matcher::self();
-    if (!m) {
-        fprintf(stderr, "Need a Matcher - call init_matcher\n");
-        return ret;
-    }
     TokenList t;
     int line = 1;
     while (true) {
@@ -687,7 +654,7 @@ AV* pattern_normalize(const char* p)
             copy = strndup(p, nl - p);
         else
             copy = strdup(p);
-        tokenize(m, t, copy, line++);
+        m->tokenize(t, copy, line++);
         free(copy);
         if (!nl)
             break;
