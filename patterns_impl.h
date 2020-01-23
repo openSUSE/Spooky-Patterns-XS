@@ -41,4 +41,4 @@ AV* pattern_hash128(SpookyHash* s);
 class BagOfPatterns;
 BagOfPatterns* pattern_init_bag_of_patterns(HV *patterns);
 void destroy_bag_of_patterns(BagOfPatterns *b);
-AV *pattern_bag_best_for(BagOfPatterns *b, const char *str);
+AV *pattern_bag_best_for(BagOfPatterns *b, const char *str, int count);

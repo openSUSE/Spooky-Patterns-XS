@@ -112,9 +112,9 @@ void DESTROY(Spooky::Patterns::XS::BagOfPatterns self)
   CODE:
     destroy_bag_of_patterns(self);
 
-AV *best_for(Spooky::Patterns::XS::BagOfPatterns self, const char *str)
+AV *best_for(Spooky::Patterns::XS::BagOfPatterns self, const char *str, int count)
   CODE:
-    RETVAL = pattern_bag_best_for(self, str);
+    RETVAL = pattern_bag_best_for(self, str, count);
 
   OUTPUT:
     RETVAL

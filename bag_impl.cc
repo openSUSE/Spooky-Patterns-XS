@@ -48,7 +48,7 @@ struct Pattern {
 class BagOfPatterns {
 public:
     BagOfPatterns(HV* patterns);
-    AV* best_for(const string& snippet);
+    AV* best_for(const string& snippet, unsigned int count);
 
 private:
     void tokenize(const char* str, wordmap& localwords);
@@ -69,9 +69,9 @@ void destroy_bag_of_patterns(BagOfPatterns* b)
     delete b;
 }
 
-AV* pattern_bag_best_for(BagOfPatterns* b, const char* str)
+AV* pattern_bag_best_for(BagOfPatterns* b, const char* str, int count)
 {
-    return b->best_for(str);
+    return b->best_for(str, count);
 }
 
 BagOfPatterns::BagOfPatterns(HV* hv_patterns)
@@ -174,29 +174,51 @@ double BagOfPatterns::compare2(const vector<TfIdf>& tf_idfs1, const Pattern& pat
     return sum / pattern.square_sum;
 }
 
-AV* BagOfPatterns::best_for(const string& snippet)
+AV* BagOfPatterns::best_for(const string& snippet, unsigned int count)
 {
     AV* result = newAV();
 
     wordmap localwords;
     tokenize(snippet.c_str(), localwords);
 
-    uint64_t best = 0;
-    double best_match = 0;
+    double highscore = -1;
 
     vector<TfIdf> tfidf;
     double square_sum = tf_idf(localwords, tfidf);
 
+    struct BagHit {
+      BagHit() {} // not used
+      BagHit(double _match, uint64_t _index) {
+        match = _match;
+        index = _index;
+      }
+      bool operator<(const BagHit &rhs) {
+        return match < rhs.match;
+      }
+      double match;
+      uint64_t index;
+    };
+    vector<BagHit> hits;
     vector<Pattern>::const_iterator it = patterns.begin();
     for (; it != patterns.end(); ++it) {
         double match = compare2(tfidf, *it);
-        if (match > best_match) {
-            best_match = match;
-            best = it->index;
+        if (match > highscore) {
+          hits.emplace_back(match, it->index);
+          sort(hits.rbegin(), hits.rend());
+          if (hits.size() > count) {
+            hits.resize(count);
+            highscore = hits.back().match;
+          }
         }
     }
-    av_push(result, newSVuv(best));
-    av_push(result, newSVnv(int(best_match * 10000 / square_sum) / 10000.));
+    for (const auto &i: hits) {
+      HV *hv = (HV *)sv_2mortal((SV *)newHV());
+      hv_store(hv, "pattern", 7, newSVuv(i.index), 0);
+      hv_store(hv, "match", 5, newSVnv(int(i.match * 10000 / square_sum) / 10000.), 0);
+      av_push(result, newRV_inc((SV*)hv));
+    }
+    //av_push(result, newSVuv(best));
+    //av_push(result, newSVnv(int(best_match * 10000 / square_sum) / 10000.));
 
     return result;
 }
