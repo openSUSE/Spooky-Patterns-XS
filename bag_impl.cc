@@ -17,6 +17,8 @@
 #include "patterns_impl.h"
 #include <EXTERN.h>
 #include <XSUB.h>
+// work around seed
+#undef seed
 #include <algorithm>
 #include <iostream>
 #include <map>
