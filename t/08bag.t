@@ -19,7 +19,9 @@ my $result = $bag->best_for('GPL is great', 2);
 is(scalar @$result, 2, 'right number');
 is_deeply( $result->[0], { pattern => 42, match => 0.5773 }, 'fits GPL' );
 
-if (0) {
+done_testing();
+
+=benchmark
     use Mojo::File;
     use Mojo::JSON 'decode_json';
     # https://stephan.kulow.org/test.json.xz
@@ -45,4 +47,3 @@ if (0) {
         last if ( $delta > 10 || $count > 1000 );
     }
 }
-done_testing();
