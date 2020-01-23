@@ -39,6 +39,9 @@ void destroy_hash(SpookyHash* s);
 AV* pattern_hash128(SpookyHash* s);
 
 class BagOfPatterns;
-BagOfPatterns* pattern_init_bag_of_patterns(HV *patterns);
+BagOfPatterns* pattern_init_bag_of_patterns();
 void destroy_bag_of_patterns(BagOfPatterns *b);
+void pattern_bag_set_patterns(BagOfPatterns *b, HV *patterns);
 AV *pattern_bag_best_for(BagOfPatterns *b, const char *str, int count);
+void pattern_bag_dump(BagOfPatterns* b, const char* filename);
+void pattern_bag_load(BagOfPatterns* b, const char* filename);

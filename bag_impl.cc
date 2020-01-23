@@ -33,6 +33,11 @@ typedef map<uint64_t, uint64_t> wordmap;
 struct TfIdf {
     uint64_t hash;
     double value;
+    TfIdf(uint64_t _hash, double _value)
+    {
+        hash = _hash;
+        value = _value;
+    }
     bool operator<(const TfIdf& str) const
     {
         return (hash < str.hash);
@@ -47,8 +52,11 @@ struct Pattern {
 
 class BagOfPatterns {
 public:
-    BagOfPatterns(HV* patterns);
+    BagOfPatterns() {}
+    void set_patterns(HV* patterns);
     AV* best_for(const string& snippet, unsigned int count);
+    void dump(const char* filename) const;
+    bool load(const char* filename);
 
 private:
     void tokenize(const char* str, wordmap& localwords);
@@ -59,9 +67,14 @@ private:
     vector<Pattern> patterns;
 };
 
-BagOfPatterns* pattern_init_bag_of_patterns(HV* patterns)
+BagOfPatterns* pattern_init_bag_of_patterns()
 {
-    return new BagOfPatterns(patterns);
+    return new BagOfPatterns();
+}
+
+void pattern_bag_set_patterns(BagOfPatterns* b, HV* patterns)
+{
+    b->set_patterns(patterns);
 }
 
 void destroy_bag_of_patterns(BagOfPatterns* b)
@@ -74,8 +87,21 @@ AV* pattern_bag_best_for(BagOfPatterns* b, const char* str, int count)
     return b->best_for(str, count);
 }
 
-BagOfPatterns::BagOfPatterns(HV* hv_patterns)
+void pattern_bag_dump(BagOfPatterns* b, const char* filename)
 {
+    b->dump(filename);
+}
+
+void pattern_bag_load(BagOfPatterns* b, const char* filename)
+{
+    b->load(filename);
+}
+
+void BagOfPatterns::set_patterns(HV* hv_patterns)
+{
+    idfs.clear();
+    patterns.clear();
+
     wordmap words;
     vector<wordmap> wordcounts;
     vector<uint64_t> indexes;
@@ -144,11 +170,9 @@ double BagOfPatterns::tf_idf(const wordmap& words, vector<TfIdf>& tf_idfs)
 {
     double square_sum = 0;
     for (wordmap::const_iterator it = words.begin(); it != words.end(); ++it) {
-        TfIdf t;
-        t.value = it->second * idfs[it->first];
-        t.hash = it->first;
-        square_sum += t.value * t.value;
-        tf_idfs.push_back(t);
+        double value = it->second * idfs[it->first];
+        square_sum += value * value;
+        tf_idfs.emplace_back(it->first, value);
     }
     sort(tf_idfs.begin(), tf_idfs.end());
     return sqrt(square_sum);
@@ -187,38 +211,123 @@ AV* BagOfPatterns::best_for(const string& snippet, unsigned int count)
     double square_sum = tf_idf(localwords, tfidf);
 
     struct BagHit {
-      BagHit() {} // not used
-      BagHit(double _match, uint64_t _index) {
-        match = _match;
-        index = _index;
-      }
-      bool operator<(const BagHit &rhs) {
-        return match < rhs.match;
-      }
-      double match;
-      uint64_t index;
+        BagHit() {} // not used
+        BagHit(double _match, uint64_t _index)
+        {
+            match = _match;
+            index = _index;
+        }
+        bool operator<(const BagHit& rhs)
+        {
+            return match < rhs.match;
+        }
+        double match;
+        uint64_t index;
     };
     vector<BagHit> hits;
     vector<Pattern>::const_iterator it = patterns.begin();
     for (; it != patterns.end(); ++it) {
         double match = compare2(tfidf, *it);
         if (match > highscore) {
-          hits.emplace_back(match, it->index);
-          sort(hits.rbegin(), hits.rend());
-          if (hits.size() > count) {
-            hits.resize(count);
-            highscore = hits.back().match;
-          }
+            hits.emplace_back(match, it->index);
+            sort(hits.rbegin(), hits.rend());
+            if (hits.size() > count) {
+                hits.resize(count);
+                highscore = hits.back().match;
+            }
         }
     }
-    for (const auto &i: hits) {
-      HV *hv = (HV *)sv_2mortal((SV *)newHV());
-      hv_store(hv, "pattern", 7, newSVuv(i.index), 0);
-      hv_store(hv, "match", 5, newSVnv(int(i.match * 10000 / square_sum) / 10000.), 0);
-      av_push(result, newRV_inc((SV*)hv));
+    for (const auto& i : hits) {
+        HV* hv = (HV*)sv_2mortal((SV*)newHV());
+        hv_store(hv, "pattern", 7, newSVuv(i.index), 0);
+        hv_store(hv, "match", 5, newSVnv(int(i.match * 10000 / square_sum) / 10000.), 0);
+        av_push(result, newRV_inc((SV*)hv));
     }
-    //av_push(result, newSVuv(best));
-    //av_push(result, newSVnv(int(best_match * 10000 / square_sum) / 10000.));
 
     return result;
+}
+
+void BagOfPatterns::dump(const char* filename) const
+{
+    FILE* file = fopen(filename, "wb");
+
+    uint64_t count = idfs.size();
+    fwrite(&count, sizeof(count), 1, file);
+
+    map<uint64_t, double>::const_iterator it = idfs.begin();
+    for (; it != idfs.end(); ++it) {
+        uint64_t f1 = it->first;
+        double f2 = it->second;
+        fwrite(&f1, sizeof(f1), 1, file);
+        fwrite(&f2, sizeof(f2), 1, file);
+    }
+
+    count = patterns.size();
+    fwrite(&count, sizeof(count), 1, file);
+
+    for (const auto& i : patterns) {
+        uint64_t f1 = i.index;
+        fwrite(&f1, sizeof(f1), 1, file);
+        double f2 = i.square_sum;
+        fwrite(&f2, sizeof(f2), 1, file);
+
+        count = i.tf_idfs.size();
+        fwrite(&count, sizeof(count), 1, file);
+        for (const auto& t : i.tf_idfs) {
+            uint64_t f1 = t.hash;
+            double f2 = t.value;
+            fwrite(&f1, sizeof(f1), 1, file);
+            fwrite(&f2, sizeof(f2), 1, file);
+        }
+    }
+}
+
+bool BagOfPatterns::load(const char* filename)
+{
+    FILE* file = fopen(filename, "rb");
+    if (!file)
+        return false;
+
+    uint64_t count = 0;
+    if (fread(&count, sizeof(count), 1, file) != 1) {
+        fclose(file);
+        return false;
+    }
+
+    idfs.clear();
+    while (count--) {
+        uint64_t f1 = 0;
+        double f2 = 0;
+        fread(&f1, sizeof(f1), 1, file);
+        fread(&f2, sizeof(f2), 1, file);
+        idfs[f1] = f2;
+    }
+
+    patterns.clear();
+    count = 0;
+    fread(&count, sizeof(count), 1, file);
+
+    while (count--) {
+        Pattern p;
+        uint64_t f1 = 0;
+        fread(&f1, sizeof(f1), 1, file);
+        p.index = f1;
+        double f2 = 0;
+        fread(&f2, sizeof(f2), 1, file);
+        p.square_sum = f2;
+
+        uint64_t f3 = 0;
+        fread(&f3, sizeof(f3), 1, file);
+
+        while (f3--) {
+            uint64_t f1;
+            double f2;
+            fread(&f1, sizeof(f1), 1, file);
+            fread(&f2, sizeof(f2), 1, file);
+            p.tf_idfs.emplace_back(f1, f2);
+        }
+        patterns.push_back(p);
+    }
+
+    return true;
 }

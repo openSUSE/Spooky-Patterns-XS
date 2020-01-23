@@ -22,9 +22,9 @@ Spooky::Patterns::XS::Hash init_hash(UV seed1, UV seed2)
     RETVAL
 
 # pass a hash of integer index to string here
-Spooky::Patterns::XS::BagOfPatterns init_patterns(HV *patterns)
+Spooky::Patterns::XS::BagOfPatterns init_bag_of_patterns()
   CODE:
-    RETVAL = pattern_init_bag_of_patterns(patterns);
+    RETVAL = pattern_init_bag_of_patterns();
 
   OUTPUT:
     RETVAL
@@ -112,9 +112,21 @@ void DESTROY(Spooky::Patterns::XS::BagOfPatterns self)
   CODE:
     destroy_bag_of_patterns(self);
 
+void set_patterns(Spooky::Patterns::XS::BagOfPatterns self, HV *patterns)
+  CODE:
+    pattern_bag_set_patterns(self, patterns);
+
 AV *best_for(Spooky::Patterns::XS::BagOfPatterns self, const char *str, int count)
   CODE:
     RETVAL = pattern_bag_best_for(self, str, count);
 
   OUTPUT:
     RETVAL
+
+void dump(Spooky::Patterns::XS::BagOfPatterns self, const char *filename)
+  CODE:
+    pattern_bag_dump(self, filename);
+
+void load(Spooky::Patterns::XS::BagOfPatterns self, const char *filename)
+  CODE:
+    pattern_bag_load(self, filename);

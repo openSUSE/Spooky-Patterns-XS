@@ -10,7 +10,10 @@ my %patterns;
 $patterns{42} = "This is the great GPL";
 $patterns{17} = "Artistic is great too";
 
-my $bag    = Spooky::Patterns::XS::init_patterns( \%patterns );
+my $bag    = Spooky::Patterns::XS::init_bag_of_patterns;
+$bag->set_patterns( \%patterns );
+$bag->dump('t/08bag.dump');
+$bag->load('t/08bag.dump');
 my $result = $bag->best_for('GPL is great', 2);
 
 is(scalar @$result, 2, 'right number');
@@ -22,9 +25,11 @@ if (0) {
     # https://stephan.kulow.org/test.json.xz
     my $json = Mojo::File->new('test.json')->slurp;
     $json   = decode_json($json);
-    $bag    = Spooky::Patterns::XS::init_patterns( $json->{patterns} );
+    $bag    = Spooky::Patterns::XS::init_bag_of_patterns;
+    $bag->set_patterns($json->{patterns});
+    #$bag->dump('test.dump');
+    #$bag->load('test.dump');
     $result = $bag->best_for( $json->{snippets}{2061026}, 10);
-    #print Dumper($result);
     is_deeply( $result->[0], { pattern => 2430, match => 0.9051 }, 'fits' );
 
     diag $json->{patterns}{17245};
