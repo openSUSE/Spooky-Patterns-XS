@@ -19,7 +19,7 @@ WriteMakefile(
     },
     LD => 'g++',
     XSOPT => '-C++',
-    LICENSE       => 'GPL-2.0+',
+    LICENSE       => 'GPL_2',
     AUTHOR            => 'Stephan Kulow <coolo@suse.de>',
     INC               => join(' ', @INC),
     LIBS              => [ join(' ', @LIBPATH, @LIBS) ],
