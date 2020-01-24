@@ -13,7 +13,7 @@ my @ps = glob('/tmp/pattern-*');
 Spooky::Patterns::XS::init_matcher();
 my $p1 = Spooky::Patterns::XS::normalize( read_file('t/07close.p1') );
 my $p2 = Spooky::Patterns::XS::normalize( read_file('t/07close.p2') );
-is( Spooky::Patterns::XS::distance( $p1, $p2 ), 4, "Distance is 2" );
+is( Spooky::Patterns::XS::distance( $p1, $p2 ), 2, "Distance is 2" );
 
 my @words1 = map { $_->[1] } @$p1;
 my @words2 = map { $_->[1] } @$p2;

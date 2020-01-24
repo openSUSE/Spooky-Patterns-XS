@@ -2,6 +2,7 @@
 #include <list>
 #include <vector>
 #include <string>
+#include <set>
 
 struct Match {
     int start;
@@ -24,7 +25,7 @@ typedef std::vector<Token> TokenList;
 class TokenTree;
 
 struct Matcher {
-    TokenTree *ignore_tree;
+    std::set<uint64_t> ignored_tokens;
     TokenTree *pattern_tree;
 
     ssize_t longest_pattern;
@@ -40,6 +41,7 @@ struct Matcher {
 
     Matcher();
     bool to_ignore(uint64_t t) const;
+    bool to_ignore(const char *t, unsigned int len) const;
     void init();
     void add_token(TokenList& result, const char* start, size_t len, int line) const;
     void tokenize(TokenList& result, char* str, int linenumber = 0);

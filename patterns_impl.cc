@@ -54,7 +54,6 @@ Matcher::Matcher()
     if (_self) {
         fprintf(stderr, "Matcher::self already initialized\n");
     }
-    ignore_tree = new TokenTree;
     pattern_tree = new TokenTree;
     init();
 }
@@ -62,37 +61,44 @@ Matcher::Matcher()
 void Matcher::init()
 {
     TokenTree::nodes.clear();
-
-    ignore_tree->initNull();
     pattern_tree->initNull();
+    ignored_tokens.clear();
 
     // typical comment and markup - have to be single tokens!
-    static const char* ignored_tokens[] = {
-        "/", "//", "%", "%%", "dnl",
-        "#~", ";;", "\"\"", "--", "#:",
-        "\\", ">", "==", "::", "##", 0
+    static const char* _ignored_tokens[] = {
+        "dnl", "\n", "\r", 0
     };
 
-    static TokenTree dummy_next;
-
     int index = 0;
-    while (ignored_tokens[index]) {
-        int len = strlen(ignored_tokens[index]);
-        uint64_t h = SpookyHash::Hash64(ignored_tokens[index], len, 1);
-        ignore_tree->insert(h, &dummy_next);
+    while (_ignored_tokens[index]) {
+        int len = strlen(_ignored_tokens[index]);
+        uint64_t h = SpookyHash::Hash64(_ignored_tokens[index], len, 1);
+        ignored_tokens.insert(h);
         index++;
     }
     longest_pattern = 0;
 }
 
+// check if the token is purely non alpha numeric
+bool Matcher::to_ignore(const char *text, unsigned int len) const
+{
+    if (!len)
+      return true;
+    while (--len) {
+      if (isalnum(text[len]))
+        return false;
+    }
+    return true;
+}
+
 bool Matcher::to_ignore(uint64_t t) const
 {
-    return ignore_tree->find(t);
+    return ignored_tokens.find(t) != ignored_tokens.end();
 }
 
 void Matcher::add_token(TokenList& result, const char* start, size_t len, int line) const
 {
-    if (!len)
+    if (to_ignore(start, len))
         return;
 
     Token t;
@@ -114,8 +120,8 @@ void Matcher::add_token(TokenList& result, const char* start, size_t len, int li
         t.hash = SpookyHash::Hash64(start, len, 1);
         assert(t.hash > MAX_SKIP);
         if (to_ignore(t.hash))
-            return;
-    }
+          return;
+      }
     result.push_back(t);
 }
 
