@@ -66,7 +66,7 @@ void Matcher::init()
 
     // typical comment and markup - have to be single tokens!
     static const char* _ignored_tokens[] = {
-        "dnl", "\n", "\r", 0
+        "dnl", "\\n", "\\r", 0
     };
 
     int index = 0;
@@ -84,9 +84,11 @@ bool Matcher::to_ignore(const char *text, unsigned int len) const
 {
     if (!len)
       return true;
-    while (--len) {
-      if (isalnum(text[len]))
+    uint64_t index = 0;
+    while (index < len) {
+      if (isalnum(text[index]))
         return false;
+      index++;
     }
     return true;
 }
