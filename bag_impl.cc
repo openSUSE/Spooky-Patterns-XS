@@ -94,9 +94,9 @@ void pattern_bag_dump(BagOfPatterns* b, const char* filename)
     b->dump(filename);
 }
 
-void pattern_bag_load(BagOfPatterns* b, const char* filename)
+bool pattern_bag_load(BagOfPatterns* b, const char* filename)
 {
-    b->load(filename);
+    return b->load(filename);
 }
 
 void BagOfPatterns::set_patterns(HV* hv_patterns)
@@ -300,32 +300,47 @@ bool BagOfPatterns::load(const char* filename)
     while (count--) {
         uint64_t f1 = 0;
         double f2 = 0;
-        fread(&f1, sizeof(f1), 1, file);
-        fread(&f2, sizeof(f2), 1, file);
+        int read = fread(&f1, sizeof(f1), 1, file);
+        read += fread(&f2, sizeof(f2), 1, file);
+        if (read != 2) {
+            fclose(file);
+            return false;
+        }
         idfs[f1] = f2;
     }
 
     patterns.clear();
     count = 0;
-    fread(&count, sizeof(count), 1, file);
+    if (fread(&count, sizeof(count), 1, file) != 1) {
+        fclose(file);
+        return false;
+    }
 
     while (count--) {
         Pattern p;
         uint64_t f1 = 0;
-        fread(&f1, sizeof(f1), 1, file);
+        int read = fread(&f1, sizeof(f1), 1, file);
         p.index = f1;
         double f2 = 0;
-        fread(&f2, sizeof(f2), 1, file);
+        read += fread(&f2, sizeof(f2), 1, file);
         p.square_sum = f2;
 
         uint64_t f3 = 0;
-        fread(&f3, sizeof(f3), 1, file);
+        read += fread(&f3, sizeof(f3), 1, file);
 
+        if (read != 3) {
+            fclose(file);
+            return false;
+        }
         while (f3--) {
             uint64_t f1;
             double f2;
-            fread(&f1, sizeof(f1), 1, file);
-            fread(&f2, sizeof(f2), 1, file);
+            read = fread(&f1, sizeof(f1), 1, file);
+            read += fread(&f2, sizeof(f2), 1, file);
+            if (read != 2) {
+                fclose(file);
+                return false;
+            }
             p.tf_idfs.emplace_back(f1, f2);
         }
         patterns.push_back(p);

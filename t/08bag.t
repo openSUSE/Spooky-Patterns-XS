@@ -30,7 +30,7 @@ done_testing();
     $bag    = Spooky::Patterns::XS::init_bag_of_patterns;
     $bag->set_patterns($json->{patterns});
     #$bag->dump('test.dump');
-    #$bag->load('test.dump');
+    #$bag->load('cavil.pattern.bag');
     $result = $bag->best_for( $json->{snippets}{2061026}, 10);
     is_deeply( $result->[0], { pattern => 2430, match => 0.9051 }, 'fits' );
 
@@ -46,4 +46,4 @@ done_testing();
         diag "$snippet: $count/$delta $result->{pattern}/$result->{match}";
         last if ( $delta > 10 || $count > 1000 );
     }
-}
+

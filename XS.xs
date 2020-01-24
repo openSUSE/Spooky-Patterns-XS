@@ -127,6 +127,9 @@ void dump(Spooky::Patterns::XS::BagOfPatterns self, const char *filename)
   CODE:
     pattern_bag_dump(self, filename);
 
-void load(Spooky::Patterns::XS::BagOfPatterns self, const char *filename)
+bool load(Spooky::Patterns::XS::BagOfPatterns self, const char *filename)
   CODE:
-    pattern_bag_load(self, filename);
+    RETVAL = pattern_bag_load(self, filename);
+
+  OUTPUT:
+    RETVAL

@@ -44,4 +44,4 @@ void destroy_bag_of_patterns(BagOfPatterns *b);
 void pattern_bag_set_patterns(BagOfPatterns *b, HV *patterns);
 AV *pattern_bag_best_for(BagOfPatterns *b, const char *str, int count);
 void pattern_bag_dump(BagOfPatterns* b, const char* filename);
-void pattern_bag_load(BagOfPatterns* b, const char* filename);
+bool pattern_bag_load(BagOfPatterns* b, const char* filename);
