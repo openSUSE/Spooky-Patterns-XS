@@ -14,9 +14,9 @@
 // with this program; if not, see <http://www.gnu.org/licenses/>.
 
 #include "patterns_impl.h"
+#include "Matcher.h"
 #include "SpookyV2.h"
 #include "TokenTree.h"
-#include "Matcher.h"
 #include <EXTERN.h>
 #include <XSUB.h>
 #include <cstring>
@@ -79,22 +79,20 @@ void Matcher::init()
     longest_pattern = 0;
 }
 
-static const char* single_seps = "-.+?\"\'`=<>";
+static const char* single_seps = "?\"\'`=";
 
 // check if the token is purely non alpha numeric
-bool Matcher::to_ignore(const char *text, unsigned int len) const
+bool Matcher::to_ignore(const char* text, unsigned int len) const
 {
     if (!len)
-      return true;
-    if (len == 1 && strchr(single_seps, text[0]))
-      return false;
+        return true;
     uint64_t index = 0;
     while (index < len) {
-      if (isalnum(text[index]))
-        return false;
-      index++;
+        if (isalnum(text[index]))
+            return false;
+        index++;
     }
-    cerr << "ignore '" << string(text, len) << endl;
+    //cerr << "ignore '" << string(text, len) << endl;
     return true;
 }
 
@@ -109,7 +107,6 @@ void Matcher::add_token(TokenList& result, const char* start, size_t len, int li
         return;
 
     Token t;
-    t.text = std::string(start, len);
     t.linenumber = line;
     t.hash = 0;
     if (!line && len > 5 && len < 9 && !strncmp(start, "$skip", 5)) {
@@ -121,14 +118,20 @@ void Matcher::add_token(TokenList& result, const char* start, size_t len, int li
         if (*endptr || t.hash > MAX_SKIP) // more than just a number
             t.hash = 0;
     }
+    //  cerr << string(start, len) << " add token '" << start[len-1] << "'\n";
+    // very special cases
+    if (start[len - 1] == '.') {
+        len--;
+    }
+    t.text = std::string(start, len);
     if (!t.hash) {
         // hash64 has no collisions on our patterns and is very fast
         // *and* 0-3000 (at least) are "free"
         t.hash = SpookyHash::Hash64(start, len, 1);
         assert(t.hash > MAX_SKIP);
         if (to_ignore(t.hash))
-          return;
-      }
+            return;
+    }
     result.push_back(t);
 }
 
@@ -180,7 +183,7 @@ AV* pattern_parse(const char* str)
         ++index;
     }
     // do not end with an expansion variable either
-    if (last_hash <= MAX_SKIP)  {
+    if (last_hash <= MAX_SKIP) {
         av_pop(ret);
     }
 
@@ -243,23 +246,24 @@ void pattern_add(Matcher* m, unsigned int id, av* tokens)
         m->longest_pattern = len;
 }
 
-void add_match(const TokenList& ts, Matches& ms, int tokenlist_offset, int tokenlist_index, unsigned int matched, int pid) {
-  Match m;
-  m.start = tokenlist_offset + tokenlist_index;
-  m.matched = matched - tokenlist_index;
+void add_match(const TokenList& ts, Matches& ms, int tokenlist_offset, int tokenlist_index, unsigned int matched, int pid)
+{
+    Match m;
+    m.start = tokenlist_offset + tokenlist_index;
+    m.matched = matched - tokenlist_index;
 
-  m.sline = ts[tokenlist_index].linenumber;
-  m.eline = ts[matched - 1].linenumber;
+    m.sline = ts[tokenlist_index].linenumber;
+    m.eline = ts[matched - 1].linenumber;
 
-  m.pattern = pid;
+    m.pattern = pid;
 #if DEBUG
-  fprintf(stderr, "L %d(%d)-%d(%d) id:%d\n", ts[tokenlist_index].linenumber,
-      tokenlist_offset + tokenlist_index, ts[matched - 1].linenumber, m.matched, m.pattern);
+    fprintf(stderr, "L %d(%d)-%d(%d) id:%d\n", ts[tokenlist_index].linenumber,
+        tokenlist_offset + tokenlist_index, ts[matched - 1].linenumber, m.matched, m.pattern);
 #endif
-  ms.push_back(m);
+    ms.push_back(m);
 }
 
-void check_token_matches(const TokenList& tokens, Matches &ms, int tokenlist_offset, int tokenlist_index, unsigned int offset, const TokenTree* patterns)
+void check_token_matches(const TokenList& tokens, Matches& ms, int tokenlist_offset, int tokenlist_index, unsigned int offset, const TokenTree* patterns)
 {
     if (offset >= tokens.size())
         return;
@@ -291,7 +295,6 @@ void check_token_matches(const TokenList& tokens, Matches &ms, int tokenlist_off
         offset++;
     }
 }
-
 
 // if either the start or the end of one region is within the other
 bool match_overlap(int s1, int e1, int s2, int e2)
@@ -555,7 +558,7 @@ AV* pattern_read_lines(const char* filename, HV* needed_lines)
             // fgets makes sure we have a 0 at the end
             size_t len = strlen(line);
             // chop
-            if (len && line[len-1] == '\n') {
+            if (len && line[len - 1] == '\n') {
                 line[--len] = 0;
             }
             AV* row = newAV();
