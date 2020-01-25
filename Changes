@@ -1,5 +1,9 @@
 Revision history for Perl extension Spooky::Patterns::XS
 
+1.55    2020-01-25
+        - Way stronger strategy on ignoring characters that
+          do not add value
+
 1.54    2020-01-23
         - Add Bag of Patterns to calculate nearest pattern
 
