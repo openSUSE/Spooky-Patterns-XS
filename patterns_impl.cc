@@ -120,6 +120,10 @@ void Matcher::add_token(TokenList& result, const char* start, size_t len, int li
     if (start[len - 1] == '.') {
         len--;
     }
+    if (start[0] == '+' || start[0] == '-') {
+        start++;
+        len--;
+    }
     t.text = std::string(start, len);
     if (!t.hash) {
         // hash64 has no collisions on our patterns and is very fast
