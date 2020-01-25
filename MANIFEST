@@ -65,6 +65,9 @@ t/07close.p1
 t/07close.p2
 t/07close.t
 t/08bag.t
+t/09normalize.1.in
+t/09normalize.1.out
+t/09normalize.t
 TokenTree.h
 t/test.t
 typemap
