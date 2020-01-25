@@ -79,8 +79,6 @@ void Matcher::init()
     longest_pattern = 0;
 }
 
-static const char* single_seps = "?\"\'`=";
-
 // check if the token is purely non alpha numeric
 bool Matcher::to_ignore(const char* text, unsigned int len) const
 {
@@ -118,8 +116,7 @@ void Matcher::add_token(TokenList& result, const char* start, size_t len, int li
         if (*endptr || t.hash > MAX_SKIP) // more than just a number
             t.hash = 0;
     }
-    //  cerr << string(start, len) << " add token '" << start[len-1] << "'\n";
-    // very special cases
+    // very special case
     if (start[len - 1] == '.') {
         len--;
     }
@@ -137,7 +134,8 @@ void Matcher::add_token(TokenList& result, const char* start, size_t len, int li
 
 void Matcher::tokenize(TokenList& result, char* str, int linenumber)
 {
-    static const char* ignore_seps = " \r\n\t*;,:!#{}()[]|";
+    static const char* ignore_seps = " \r\n\t*;,:!#{}()[]|><";
+    static const char* single_seps = "?\"\'`'=";
 
     const char* start = str;
 
