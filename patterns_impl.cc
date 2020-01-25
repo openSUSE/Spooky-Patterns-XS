@@ -79,17 +79,22 @@ void Matcher::init()
     longest_pattern = 0;
 }
 
+static const char* single_seps = "-.+?\"\'`=<>";
+
 // check if the token is purely non alpha numeric
 bool Matcher::to_ignore(const char *text, unsigned int len) const
 {
     if (!len)
       return true;
+    if (len == 1 && strchr(single_seps, text[0]))
+      return false;
     uint64_t index = 0;
     while (index < len) {
       if (isalnum(text[index]))
         return false;
       index++;
     }
+    cerr << "ignore '" << string(text, len) << endl;
     return true;
 }
 
@@ -130,7 +135,6 @@ void Matcher::add_token(TokenList& result, const char* start, size_t len, int li
 void Matcher::tokenize(TokenList& result, char* str, int linenumber)
 {
     static const char* ignore_seps = " \r\n\t*;,:!#{}()[]|";
-    static const char* single_seps = "-.+?\"\'`=<>";
 
     const char* start = str;
 
