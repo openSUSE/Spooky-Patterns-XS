@@ -4,6 +4,6 @@ hallo
 
 spdx-license-identifier epl-1.0 
 
-p spdx-license-identifier epl-1.0 /p 
+spdx-license-identifier epl-1.0 
 
 hallo world 

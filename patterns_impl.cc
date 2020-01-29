@@ -66,7 +66,7 @@ void Matcher::init()
 
     // typical comment and markup - have to be single tokens!
     static const char* _ignored_tokens[] = {
-        "dnl", "\\n", "\\r", 0
+        "dnl", "\\n", "\\r", "rem", "br", "p", "c", "cc", "a", 0
     };
 
     int index = 0;
@@ -101,6 +101,15 @@ bool Matcher::to_ignore(uint64_t t) const
 
 void Matcher::add_token(TokenList& result, const char* start, size_t len, int line) const
 {
+    // very special cases
+    if (len > 1 && start[len - 1] == '.') {
+        len--;
+    }
+    while (len > 1 && (start[0] == '+' || start[0] == '-' || start[0] == '/')) {
+        start++;
+        len--;
+    }
+
     if (to_ignore(start, len))
         return;
 
@@ -115,14 +124,6 @@ void Matcher::add_token(TokenList& result, const char* start, size_t len, int li
         t.hash = strtol(number, &endptr, 10);
         if (*endptr || t.hash > MAX_SKIP) // more than just a number
             t.hash = 0;
-    }
-    // very special case
-    if (start[len - 1] == '.') {
-        len--;
-    }
-    if (start[0] == '+' || start[0] == '-') {
-        start++;
-        len--;
     }
     t.text = std::string(start, len);
     if (!t.hash) {

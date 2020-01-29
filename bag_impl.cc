@@ -67,22 +67,19 @@ private:
 
     map<uint64_t, double> idfs;
     vector<Pattern> patterns;
+#if DEBUG
+    map<uint64_t, string> debugwords;
+#endif
 };
 
-BagOfPatterns* pattern_init_bag_of_patterns()
-{
-    return new BagOfPatterns();
-}
+BagOfPatterns* pattern_init_bag_of_patterns() { return new BagOfPatterns(); }
 
 void pattern_bag_set_patterns(BagOfPatterns* b, HV* patterns)
 {
     b->set_patterns(patterns);
 }
 
-void destroy_bag_of_patterns(BagOfPatterns* b)
-{
-    delete b;
-}
+void destroy_bag_of_patterns(BagOfPatterns* b) { delete b; }
 
 AV* pattern_bag_best_for(BagOfPatterns* b, const char* str, int count)
 {
@@ -134,6 +131,10 @@ void BagOfPatterns::set_patterns(HV* hv_patterns)
     }
     for (wordmap::const_iterator it = words.begin(); it != words.end(); ++it) {
         idfs[it->first] = log(double(indexes.size()) / it->second);
+#if DEBUG
+        cerr << int(idfs[it->first] * 1000) << " " << indexes.size() << " "
+             << it->second << " " << debugwords[it->first] << endl;
+#endif
     }
 
     vector<uint64_t>::const_iterator index_it = indexes.begin();
@@ -158,6 +159,9 @@ void BagOfPatterns::tokenize(const char* str, wordmap& localwords)
     for (TokenList::const_iterator it = t.begin(); it != t.end(); ++it) {
         if (it->hash == last_hash)
             continue;
+#if DEBUG
+        debugwords[it->hash] = it->text;
+#endif
         last_hash = it->hash;
         wordmap::iterator word_it = localwords.find(it->hash);
         if (word_it == localwords.end()) {
