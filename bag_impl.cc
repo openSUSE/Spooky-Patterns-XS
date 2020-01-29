@@ -211,6 +211,7 @@ AV* BagOfPatterns::best_for(const string& snippet, unsigned int count)
 
     vector<TfIdf> tfidf;
     double square_sum = tf_idf(localwords, tfidf);
+    cerr << "sq " << square_sum << endl;
 
     struct BagHit {
         BagHit() {} // not used
@@ -230,6 +231,7 @@ AV* BagOfPatterns::best_for(const string& snippet, unsigned int count)
     vector<Pattern>::const_iterator it = patterns.begin();
     for (; it != patterns.end(); ++it) {
         double match = compare2(tfidf, *it);
+        cerr << "match " << match << endl;
         if (match > highscore) {
             hits.emplace_back(match, it->index);
             sort(hits.rbegin(), hits.rend());
