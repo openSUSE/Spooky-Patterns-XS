@@ -154,21 +154,12 @@ void BagOfPatterns::tokenize(const char* str, wordmap& localwords)
     Matcher::self()->tokenize(t, copy, 1);
     free(copy);
 
-    // avoid '=======' dominating matches
-    uint64_t last_hash = 0;
     for (TokenList::const_iterator it = t.begin(); it != t.end(); ++it) {
-        if (it->hash == last_hash)
-            continue;
 #if DEBUG
         debugwords[it->hash] = it->text;
 #endif
-        last_hash = it->hash;
-        wordmap::iterator word_it = localwords.find(it->hash);
-        if (word_it == localwords.end()) {
-            localwords[it->hash] = 1;
-        } else {
-            word_it->second++;
-        }
+        // only count a word once per document
+        localwords[it->hash] = 1;
     }
 }
 
