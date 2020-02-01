@@ -66,7 +66,8 @@ void Matcher::init()
 
     // typical comment and markup - have to be single tokens!
     static const char* _ignored_tokens[] = {
-        "dnl", "\\n", "\\r", "rem", "br", "p", "c", "cc", "a", 0
+        "dnl", "\\n", "\\r", "rem", "br", "p", "c", "cc", "a",
+        "n", "r", 0
     };
 
     int index = 0;
@@ -139,7 +140,7 @@ void Matcher::add_token(TokenList& result, const char* start, size_t len, int li
 
 void Matcher::tokenize(TokenList& result, char* str, int linenumber)
 {
-    static const char* ignore_seps = " \r\n\t*;,:!#{}()[]|><";
+    static const char* ignore_seps = " \r\n\t*;,:!#{}()[]|></\\";
     static const char* single_seps = "?\"\'`'=";
 
     const char* start = str;
